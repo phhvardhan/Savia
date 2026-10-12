@@ -1,0 +1,134 @@
+.panel { overflow: hidden; }
+
+.block { padding: 26px 30px 30px; }
+
+.label {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #404040;
+}
+
+/* The passage you selected ------------------------------------------------ */
+.passage {
+  padding: 20px 22px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.passageHead { display: flex; align-items: baseline; gap: 12px; }
+
+.passageNum { font-size: 14px; font-weight: 700; color: var(--brand-red); }
+
+.passageTitle { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+
+.quote {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--brand-red);
+  border-radius: var(--radius);
+  background: var(--red-tint);
+  font-size: 14px;
+  line-height: 160%;
+  color: var(--brand-red);
+}
+
+/* Instruction ------------------------------------------------------------- */
+.ask {
+  margin-top: 22px;
+  border: 1px solid #EB1700;
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+  box-shadow: 0px 10px 24px -6px #EB170024;
+  overflow: hidden;
+}
+
+.askRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 16px 16px 20px;
+}
+
+/* The icon now carries its own dashed frame, so it just sits inline. */
+.askIcon { display: flex; flex: none; }
+
+.askInput {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.askInput:focus, .askInput:focus-visible { outline: none; }
+
+.presets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 20px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.presetLabel {
+  margin-right: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.preset {
+  padding: 7px 14px;
+  border: 1px solid #E9E6E3;
+  border-radius: var(--radius-pill);
+  background: #F8F9FA;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.preset:hover { border-color: var(--brand-red); color: var(--brand-red); }
+
+/* Guardrails -------------------------------------------------------------- */
+.guardrails {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.guardrail {
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.guardrailTitle { font-size: 15px; font-weight: 700; color: var(--brand-red); }
+
+.guardrailText { margin-top: 12px; font-size: 14px; line-height: 150%; color: var(--text-muted); }
+
+.divider { border-top: 1px solid var(--line-soft); }
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 900px) {
+  .guardrails { grid-template-columns: minmax(0, 1fr); }
+  .askRow { flex-wrap: wrap; }
+  .block { padding: 22px 18px 26px; }
+  .actions { flex-direction: column; padding: 22px 18px 26px; }
+}

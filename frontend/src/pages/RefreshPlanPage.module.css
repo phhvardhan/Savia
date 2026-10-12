@@ -1,0 +1,134 @@
+.panel { overflow: hidden; }
+
+.block { padding: 24px 30px 28px; }
+.divider { border-top: 1px solid var(--line-soft); }
+
+.label {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-red);
+}
+
+.labelDark {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+/* What will be redone -------------------------------------------------- */
+.redoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.redoCard {
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.redoHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.redoTitle { font-size: 16px; font-weight: 700; }
+
+.toneRerun .redoTitle { color: var(--brand-red); }
+.toneAdd .redoTitle { color: var(--green); }
+
+.redoPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  white-space: nowrap;
+}
+
+.toneRerun .redoPill { background: var(--brand-red); }
+.toneAdd .redoPill { background: var(--green); }
+
+.pillDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.redoBody {
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.redoList { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+
+.redoItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.bullet { color: var(--text-soft); }
+
+/* What carries forward untouched — table state pills -------------------- */
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stateKept { background: var(--green-tint); color: #2F7A1E; }
+.stateProtected { background: var(--green); color: #FFFFFF; }
+
+.statsBorder { border-top: 1px solid var(--line-soft); }
+
+/* Footer ------------------------------------------------------------------ */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.footerTitle {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--brand-red);
+}
+
+.footerBody { margin-top: 8px; font-size: 14px; line-height: 150%; color: var(--text-muted); }
+
+.footerActions { display: flex; gap: 12px; flex: none; }
+
+@media (max-width: 900px) {
+  .block { padding: 22px 18px 24px; }
+  .redoGrid { grid-template-columns: 1fr; }
+  .footer { flex-direction: column; align-items: flex-start; gap: 20px; padding: 22px 18px 26px; }
+}

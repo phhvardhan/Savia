@@ -1,0 +1,17 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* The big page panels — same cap on every page so none run wider than the
+   next just because that page happens to have more columns. */
+.flush {
+  max-width: 1040px;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+}
+
+.padded { padding: 24px; }
+
+.bare { border: 0; background: none; }

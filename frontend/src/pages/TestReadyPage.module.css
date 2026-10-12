@@ -1,0 +1,137 @@
+.panel { overflow: hidden; }
+
+.block { padding: 26px 30px 30px; }
+.divider { border-top: 1px solid var(--line-soft); }
+
+.label {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #404040;
+}
+
+.readyPill {
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  box-shadow: 0px 4px 12px 0px #0000001F;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* The four things --------------------------------------------------------- */
+.needs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.need {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 20px;
+  border-radius: var(--radius);
+  background: linear-gradient(150deg, #EB1700 0%, #D9722A 100%);
+  color: #FFFFFF;
+}
+
+.needHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.needLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #FFFFFFD9;
+}
+
+.haveIt {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  color: var(--brand-red);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.needValue { margin-top: 14px; font-size: 17px; font-weight: 700; line-height: 140%; }
+
+.needSource { margin-top: 12px; font-size: 14px; color: #FFFFFFD9; }
+
+/* What it will produce ---------------------------------------------------- */
+.produces {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.produce {
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.produceHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.produceTitle { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+
+.thePoint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--red-tint);
+  color: var(--brand-red);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pointDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.produceText { margin-top: 14px; font-size: 14px; line-height: 150%; color: var(--text-muted); }
+
+.produceNote {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--brand-red);
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 1000px) {
+  .needs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .produces { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 620px) {
+  .block { padding: 22px 18px 26px; }
+  .needs { grid-template-columns: minmax(0, 1fr); }
+  .actions { flex-direction: column; padding: 22px 18px 26px; }
+}

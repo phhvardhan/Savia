@@ -1,0 +1,91 @@
+.panel { overflow: hidden; }
+
+.block { padding: 24px 30px 28px; }
+.divider { border-top: 1px solid var(--line-soft); }
+
+.label {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+/* What is missing ----------------------------------------------------------- */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 22px 26px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #EB1700, #7A0900);
+  color: #FFFFFF;
+}
+
+.bannerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius);
+  background: #FFFFFF;
+  color: var(--brand-red);
+}
+
+.bannerTitle { font-size: 19px; font-weight: 700; }
+
+.bannerText {
+  margin-top: 8px;
+  max-width: 780px;
+  font-size: 14px;
+  line-height: 152%;
+  color: #FFFFFFD9;
+}
+
+/* What it already has -------------------------------------------------------- */
+.hasGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.hasCard {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.hasHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hasTitle { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+
+.hasText { margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+
+/* Footer ---------------------------------------------------------------------- */
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 900px) {
+  .block { padding: 22px 18px 24px; }
+  .banner { flex-direction: column; align-items: flex-start; }
+  .hasGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .footer { flex-direction: column; align-items: stretch; padding: 22px 18px 26px; }
+}
+
+@media (max-width: 560px) {
+  .hasGrid { grid-template-columns: 1fr; }
+}

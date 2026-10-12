@@ -1,0 +1,48 @@
+.panel { overflow: hidden; }
+
+.overdue { color: var(--red); font-weight: 500; }
+
+.unblocked { padding: 30px 24px 34px; border-top: 1px solid var(--line-soft); }
+
+.label {
+  margin-bottom: 20px;
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.card { padding: 20px 22px 22px; }
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.cardTitle { font-size: 16px; font-weight: 600; color: var(--ink); }
+
+.cardMeta { margin-top: 12px; color: var(--text-soft); font-size: 14px; }
+
+.statsBorder { border-top: 1px solid var(--line-soft); }
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px 24px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 900px) {
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .actions { flex-direction: column; }
+}

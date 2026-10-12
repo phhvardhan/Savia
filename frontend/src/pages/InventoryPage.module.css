@@ -1,0 +1,83 @@
+.panel { overflow: hidden; }
+
+.filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 30px;
+}
+
+.filterList { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.filter {
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.filter:hover { border-color: #CFD2D5; }
+.filterActive { background: var(--ink); border-color: var(--ink); color: #FFFFFF; }
+
+.personaSelect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-red);
+  cursor: pointer;
+}
+
+.tc { color: #005EEB; font-weight: 600; }
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.statusReady { background: var(--green); color: #FFFFFF; }
+.statusEdited { background: var(--slate); color: #FFFFFF; }
+.statusPartial { background: #E08A22; color: #FFFFFF; }
+.statusNeeds { background: var(--brand-red); color: #FFFFFF; }
+.statusDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.footerTitle {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--brand-red);
+}
+
+.footerBody { margin-top: 8px; font-size: 14px; line-height: 150%; color: var(--text-muted); }
+
+.footerActions { display: flex; gap: 12px; flex: none; }
+
+@media (max-width: 900px) {
+  .filters { flex-direction: column; align-items: flex-start; gap: 14px; padding: 20px 18px; }
+  .footer { flex-direction: column; align-items: flex-start; gap: 20px; padding: 22px 18px 26px; }
+}

@@ -1,0 +1,372 @@
+.panel { overflow: hidden; }
+
+.titleRed { color: var(--brand-red); }
+
+
+/* Board ------------------------------------------------------------------- */
+.board {
+  display: grid;
+  /* Side columns are sized to their content; the middle takes the rest. */
+  grid-template-columns: 252px 76px minmax(0, 1fr) 76px 240px;
+  align-items: stretch;
+  padding: 34px 30px 40px;
+}
+
+.columnLabel {
+  grid-row: 1;
+  margin-bottom: 26px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #4C4C4C;
+}
+.labelGave { grid-column: 1; }
+.labelWorking { grid-column: 3; color: var(--brand-red); font-weight: 700; }
+.labelRecommends { grid-column: 5; }
+
+.gave {
+  grid-row: 2;
+  grid-column: 1;
+  display: grid;
+  grid-template-rows: repeat(2, 1fr);
+  gap: 22px;
+}
+
+.inputCard {
+  align-self: center;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.inputHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.inputTitle {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 140%;
+  color: var(--text-primary);
+}
+.inputMeta { margin-top: 14px; font-size: 14px; line-height: 148%; color: var(--text-muted); }
+.inputList { margin-top: 10px; display: grid; gap: 8px; }
+
+.inputItem {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.bullet { color: var(--text-soft); }
+
+/* Orchestrator ------------------------------------------------------------ */
+.orchestrator {
+  grid-row: 2;
+  grid-column: 3;
+  /* Centred, so it stays level with the two columns either side however tall
+     the live recommendations make them. */
+  align-self: center;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #DB6B2A;
+  /* Matches the header bar inside it, so the gradient corners sit flush. */
+  border-radius: 13.14px;
+  background: var(--surface-canvas);
+}
+
+/* Figma spec for the orchestrator header bar. */
+.orchestratorHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10.95px;
+  padding: 13.14px 15.33px 13.14px 17.52px;
+  /* No radius of its own — the parent's overflow clip supplies the curve, so
+     the gradient meets the border with no gap at the top corners. */
+  border-radius: 0;
+  background: linear-gradient(94.68deg, #EB1700 8.32%, #7F0142 52.27%, #EB7600 96.22%);
+  color: #FFFFFF;
+}
+
+.orchestratorName {
+  font-family: var(--font-sans);
+  font-size: 15.33px;
+  font-weight: 700;
+  line-height: 140%;
+  letter-spacing: 0;
+}
+
+.orchestratorState {
+  font-family: var(--font-sans);
+  font-size: 9.85px;
+  font-weight: 500;
+  line-height: 140%;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: #FFFFFFD9;
+}
+
+.step { padding: 16px 20px; border-top: 1px solid var(--line-soft); }
+.step:first-of-type { border-top: 0; }
+
+.stepHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stepTitle {
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.stepTitleNext { color: var(--text-soft); }
+
+.stepNote { margin-top: 10px; font-size: 14px; line-height: 148%; color: var(--text-muted); }
+
+.statePill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6.57px;
+  padding: 4.38px 9.85px 4.38px 8.76px;
+  border-radius: 4.38px;
+  font-family: var(--font-public);
+  font-size: 9.85px;
+  font-weight: 600;
+  line-height: 140%;
+  letter-spacing: 0.13em;
+}
+
+/* Values below come straight from the Figma spec for the Done pill. */
+.stateDone { background: #E7F2ED; color: #0F7A5A; }
+.stateNext { background: var(--chip); color: var(--text-muted); }
+.stateNow { background: var(--red-tint); color: var(--brand-red); }
+.stateDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* What it recommends ------------------------------------------------------ */
+.recommends {
+  grid-row: 2;
+  grid-column: 5;
+  display: grid;
+  /* Rows size to their card; the gap does the spacing the 1fr rows used to. */
+  grid-template-rows: repeat(3, auto);
+  align-content: center;
+  gap: 14px;
+}
+
+.recommend {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.recommendChosen {
+  border-color: #005EEB;
+  background: #005EEB;
+  color: #FFFFFF;
+  box-shadow: 0 10px 22px -12px #005EEB;
+}
+
+.recommendHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recommendTitle {
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.recommendChosen .recommendTitle { color: #FFFFFF; }
+.recommendMuted { color: var(--text-soft); }
+
+.recommendText { display: block; margin-top: 10px; font-size: 14px; line-height: 148%; color: var(--text-muted); }
+.recommendChosen .recommendText { color: #FFFFFFE0; }
+
+.chosenPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  color: #005EEB;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.connector { grid-row: 2; width: 100%; height: 100%; }
+.connectorLeft { grid-column: 2; }
+.connectorRight { grid-column: 4; }
+
+.statsBorder { border-top: 1px solid var(--line-soft); }
+
+/* Footer ------------------------------------------------------------------ */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.footerTitle {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.footerBody { margin-top: 10px; font-size: 15px; line-height: 148%; color: var(--text-muted); }
+
+.footerActions { display: flex; gap: 14px; flex: none; }
+
+@media (max-width: 1080px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 26px;
+    padding: 26px 20px 32px;
+  }
+  .columnLabel, .gave, .orchestrator, .recommends { grid-row: auto; grid-column: auto; }
+  .columnLabel { margin-bottom: 0; text-align: left; }
+  .gave, .recommends { grid-template-rows: none; gap: 14px; }
+  .connector { display: none; }
+  .footer { flex-direction: column; align-items: flex-start; gap: 22px; padding: 26px 20px; }
+  .footerActions { width: 100%; }
+}
+
+@media (max-width: 560px) {
+  .footerActions { flex-direction: column; }
+}
+
+/* ==========================================================================
+   Reveal sequence — the board builds itself while Savia "reads".
+   Everything is scoped under .reveal, which ReadingPage adds only on the
+   first mount of a page load. Without it the board renders fully formed,
+   so re-visits and re-renders never replay the sequence.
+   ========================================================================== */
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Wipes the strokes in left to right. Using a clip rather than a dash offset
+   keeps the dashed "not needed" connector dashed once it has drawn. */
+@keyframes drawIn {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+.reveal .inputCard,
+.reveal .recommend {
+  opacity: 0;
+  animation: riseIn 0.45s ease-out forwards;
+}
+
+/* 1 — what you gave it */
+.reveal .inputCard:nth-child(1) { animation-delay: 0.10s; }
+.reveal .inputCard:nth-child(2) { animation-delay: 0.25s; }
+
+/* 2 — what it recommends */
+.reveal .recommend:nth-child(1) { animation-delay: 0.40s; }
+.reveal .recommend:nth-child(2) { animation-delay: 0.55s; }
+.reveal .recommend:nth-child(3) { animation-delay: 0.70s; }
+
+/* 3 — the orchestrator steps are present from the start. They do not fade in;
+   each one turns Now then Done in sequence, driven from ReadingPage.tsx. */
+
+/* 4 — the lines joining the three columns */
+.reveal .connector {
+  clip-path: inset(0 100% 0 0);
+  animation: drawIn 0.7s ease-out forwards;
+}
+.reveal .connectorLeft { animation-delay: 1.95s; }
+.reveal .connectorRight { animation-delay: 2.25s; }
+
+/* The live step keeps pulsing after it has arrived. */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.stateNow .stateDot { animation: pulseDot 1.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal .inputCard,
+  .reveal .recommend,
+  .reveal .connector {
+    opacity: 1;
+    clip-path: none;
+    animation: none;
+  }
+  .stateNow .stateDot { animation: none; }
+}
+
+/* Live recommendation states --------------------------------------------- */
+.confidence {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-soft);
+}
+
+.recommendPending,
+.recommendError {
+  padding: 16px 18px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 150%;
+  color: var(--text-muted);
+}
+
+.recommendError {
+  border-style: solid;
+  border-color: #F6D9D4;
+  background: var(--red-tint);
+  color: var(--red-dark);
+}
+
+/* Recommendation cards are buttons — pick the agent to run. */
+.recommendButton {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.recommendButton .recommendHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.recommendButton:not(.recommendChosen):hover {
+  border-color: #005EEB;
+  box-shadow: 0 4px 12px 0 #005EEB1F;
+}

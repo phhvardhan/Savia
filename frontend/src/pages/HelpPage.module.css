@@ -1,0 +1,122 @@
+.panel { overflow: hidden; }
+
+.handoff {
+  /* Spec width, but capped by the panel so it still fits narrow screens. */
+  max-width: 1040px;
+  padding: 34px 30px 30px;
+}
+
+.label {
+  margin-bottom: 18px;
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tiles {
+  display: grid;
+  /* Fixed tile width from the spec; they wrap rather than shrink. */
+  grid-template-columns: repeat(4, 233px);
+  gap: 14px;
+}
+
+/* Figma spec for the four handoff tiles. */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 72px;
+  padding: 14px 16px;
+  border: 1px solid #E9E6E3;
+  border-radius: 10px;
+  color: #FFFFFF;
+}
+
+.tileFrom { background: linear-gradient(94.53deg, #EB1700 -1.32%, #EB7600 100.98%); }
+.tileTo { background: linear-gradient(94.09deg, #EBB400 -3%, #00EB1B 99.49%); }
+.tileBy { background: linear-gradient(93.54deg, #00C0EB -2.7%, #3300EB 99.58%); }
+.tileWhen { background: linear-gradient(93.86deg, #CC11E9 -2.74%, #EB0043 102.01%); }
+
+.tileLabel {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 140%;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+
+.tileValue {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 140%;
+  letter-spacing: 0;
+}
+
+.footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 34px 30px 38px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.footerText { max-width: 640px; }
+
+/* Figma spec for the footer block. */
+.footerTitle {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 100%;
+  letter-spacing: -0.01em;
+  color: var(--red);
+}
+
+.footerBody {
+  margin-top: 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 140%;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.footerActions { display: flex; gap: 14px; flex: none; }
+
+@media (max-width: 1000px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .footer { flex-direction: column; gap: 22px; }
+}
+
+@media (max-width: 620px) {
+  .handoff { padding: 24px 18px; }
+  .tiles { grid-template-columns: minmax(0, 1fr); }
+  .footer { padding: 26px 18px 30px; }
+  .footerTitle { font-size: 24px; }
+  .footerActions { flex-direction: column; width: 100%; }
+}
+
+
+/* Figma spec for the page heading. */
+.pageTitle {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 100%;
+  letter-spacing: -0.01em;
+  color: #101418;
+}
+
+/* The primary action carries its own size from the spec. */
+.approveButton {
+  height: 44px;
+  padding: 13px 22px;
+  border-radius: 10px;
+}

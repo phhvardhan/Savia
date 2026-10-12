@@ -1,0 +1,28 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.available, .solidGreen { background: var(--green); color: #FFFFFF; }
+.inReview { background: var(--orange); color: #FFFFFF; }
+.comingSoon { background: var(--slate); color: #FFFFFF; }
+.waiting { background: var(--slate); color: #FFFFFF; }
+.running { background: var(--red); color: #FFFFFF; }
+.needsYou { background: var(--red); color: #FFFFFF; }
+.doneSoft { background: var(--green-tint); color: #2F7A22; }
+.runningSoft { background: var(--red-tint); color: var(--red); }
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}

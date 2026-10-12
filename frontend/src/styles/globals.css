@@ -1,0 +1,175 @@
+/* ==========================================================================
+   SAVIA — design tokens, reset and shared primitives
+   Colour values are sampled directly from the Figma reference exports.
+   ========================================================================== */
+
+/* Public Sans — the SAVIA wordmark and small helper text. */
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500&display=swap');
+
+/* Johnson Sans / Johnson Text — J&J Brand Font (font.woff2) */
+@font-face {
+  font-family: 'Johnson Sans';
+  src: url('/fonts/font.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Johnson Text';
+  src: url('/fonts/font.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Johnson Display';
+  src: url('/fonts/font.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Brand + status */
+  --red: #EB1700;
+  --red-dark: #D11300;
+  --red-tint: #FEEFED;
+  --green: #49A032;
+  --green-tint: #E9F2ED;
+  --orange: #DC7D2E;
+  --slate: #4B5156;
+
+  /* Neutrals */
+  --ink: #111418;
+  --ink-deep: #1C1E21;
+  --text: #16181B;
+  --text-muted: #5C6166;
+  --text-soft: #83888D;
+  --icon: #767E85;
+  --page: #F8F9FA;
+  --surface: #FFFFFF;
+  --surface-alt: #FAF9F8;
+  --line: #E7E8EA;
+  --line-soft: #F0F1F2;
+  --chip: #F1EFED;
+
+  /* Design-system aliases — these are the names the Figma specs use. */
+  --brand-red: #EB1700;
+  --text-primary: #101418;
+  --text-tertiary: #767E85;
+  --border-subtle: #E8E4E0;
+  --surface-canvas: #FFFFFF;
+
+  /* Hero gradient */
+  --hero-gradient: linear-gradient(271.93deg, #CA0000 -0.47%, #BA0303 18.42%, #860B0B 60.57%, #411515 111.42%, #381A1A 150.91%);
+  --border-gradient: linear-gradient(90deg, #750C0C 0%, #DB1717 100%);
+
+  /* Type */
+  --font-display: 'Johnson Sans', 'Johnson Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Johnson Sans', 'Johnson Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-public: 'Public Sans', 'Johnson Sans', sans-serif;
+
+  /* Metrics */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --shell-max: 1430px;
+  --gutter: 200px;
+  --header-gutter: 48px;   /* the header rows run full-bleed */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  font-family: 'Johnson Sans', 'Johnson Text', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+html, body {
+  font-family: 'Johnson Sans', 'Johnson Text', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: 'Johnson Sans', 'Johnson Text', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Enforce Johnson Sans across all interactive elements & form controls */
+input,
+textarea,
+select,
+button,
+optgroup {
+  font-family: 'Johnson Sans', 'Johnson Text', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: 'Johnson Sans', 'Johnson Text', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-weight: 700;
+}
+p, span, div, li, td, th, label, a {
+  font-family: 'Johnson Sans', 'Johnson Text', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+dl, dd, dt { margin: 0; }
+
+a { color: inherit; text-decoration: none; }
+
+button { font: inherit; color: inherit; }
+
+img { display: block; max-width: 100%; }
+
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Shared page scaffolding ------------------------------------------------ */
+
+.shell {
+  width: 100%;
+  max-width: var(--shell-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+@media (max-width: 1280px) {
+  :root { --gutter: 96px; }
+}
+
+@media (max-width: 1080px) {
+  :root { --gutter: 48px; }
+}
+
+@media (max-width: 900px) {
+  :root { --gutter: 24px; --header-gutter: 24px; }
+}
+
+@media (max-width: 560px) {
+  :root { --gutter: 16px; --header-gutter: 16px; }
+  body { font-size: 14px; }
+}

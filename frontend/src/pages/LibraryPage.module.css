@@ -1,0 +1,290 @@
+/* Hero -------------------------------------------------------------------- */
+.hero {
+  background: var(--hero-gradient);
+  color: #FFFFFF;
+  padding: 92px 0 104px;
+  text-align: center;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #FFFFFFDB;
+}
+
+.heroTitle {
+  margin-top: 26px;
+  font-family: var(--font-display);
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.heroBody {
+  margin: 22px auto 0;
+  max-width: 800px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #FFFFFFE6;
+}
+
+.finder {
+  margin: 40px auto 0;
+  max-width: 900px;
+  padding: 18px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(#FFFFFF, #FFFFFF) padding-box,
+    var(--border-gradient) border-box;
+  text-align: left;
+  box-shadow: 0 24px 60px -30px #00000099;
+}
+
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Hover darkens to red and keeps the label white, so the active tab stays
+   legible instead of turning white-on-white. */
+.tab:hover,
+.tab:hover.tabActive {
+  background: var(--red-dark);
+  color: #FFFFFF;
+}
+.tabActive { background: var(--chip); color: var(--ink); font-weight: 700; }
+
+.glyph {
+  width: 16px;
+  height: 16px;
+  border: 1px dashed #D7D4D0;
+  border-radius: 3px;
+  background: var(--chip);
+  flex: none;
+}
+
+.finderRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 0 4px 0 14px;
+}
+
+.finderInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 12px 0;
+  font-size: 17px;
+  color: var(--text);
+  background: none;
+}
+.finderInput::placeholder { color: var(--text-soft); }
+
+/* No focus ring on the finder itself — the card frames it and the caret
+   shows where you are typing. */
+.finderInput:focus,
+.finderInput:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.finderGlyphs { display: flex; gap: 10px; flex: none; }
+
+.heroHint {
+  margin-top: 18px;
+  font-size: 13px;
+  color: #FFFFFFC7;
+}
+
+/* Browse by stage --------------------------------------------------------- */
+.stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 26px;
+}
+
+.stageCard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.stageImage { width: 100%; aspect-ratio: 336 / 164; object-fit: cover; }
+
+.stageBody { padding: 20px 22px 24px; }
+
+.stageName { font-size: 18px; font-weight: 700; color: var(--ink); }
+
+.stageCount { margin-top: 10px; font-size: 14px; color: var(--text-soft); }
+.stageCount strong { color: var(--red); font-weight: 700; }
+
+/* Library contract table -------------------------------------------------- */
+.altSection { background: var(--surface-alt); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.filter {
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.filter:hover { border-color: #CFD2D5; }
+.filterActive { background: var(--ink); border-color: var(--ink); color: #FFFFFF; }
+
+.systems { color: var(--red); }
+
+.mutedName { color: var(--text-soft); }
+
+.rowIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+  vertical-align: -5px;
+  color: var(--icon);
+}
+
+.rowIcon svg { width: 18px; height: 18px; }
+
+/* Recommendations --------------------------------------------------------- */
+.picks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+}
+
+/* Same treatment as the counters on the Work hero: a white card with a thick
+   accent edge, rather than a bare rule against the page background. */
+.pick {
+  padding: 18px 22px;
+  border-radius: 12px;
+  border-left: 3px solid #09A313;
+  background: #FFFFFF;
+}
+
+.pickHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pickStage {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pickTitle {
+  margin-top: 14px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pickBody { margin-top: 14px; color: var(--text-muted); font-size: 15px; line-height: 1.6; }
+
+.pickMeta { margin-top: 18px; font-size: 14px; color: var(--text-soft); }
+
+.pickActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+
+/* Dark closing strip ------------------------------------------------------ */
+.notes { background: var(--ink-deep); color: #FFFFFF; padding: 64px 0 72px; }
+
+.notesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 46px;
+}
+
+.noteLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.noteBody { margin-top: 16px; color: #FFFFFFB8; font-size: 15px; line-height: 1.65; }
+
+@media (max-width: 1000px) {
+  .hero { padding: 58px 0 66px; }
+  .heroTitle { font-size: 40px; }
+  .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .picks, .notesGrid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+}
+
+@media (max-width: 620px) {
+  .heroTitle { font-size: 30px; }
+  .heroBody { font-size: 15px; }
+  .finder { padding: 14px; }
+  .finderRow { flex-wrap: wrap; padding-left: 8px; }
+  .finderInput { font-size: 15px; }
+  .stages { grid-template-columns: minmax(0, 1fr); }
+  .notes { padding: 44px 0 48px; }
+}
+
+
+/* Finder — matches the Work page. */
+.tabIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--icon);
+}
+.tab:hover .tabIcon { color: #FFFFFF; }
+/* Unlike Work, this page's active tab is a light chip with dark text, so the
+   icon follows the label into ink rather than turning white and vanishing. */
+.tabActive .tabIcon { color: var(--ink); }
+
+.finderAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--icon);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.finderAction:hover {
+  border-color: var(--red);
+  background: var(--red-tint);
+  color: var(--red-dark);
+}

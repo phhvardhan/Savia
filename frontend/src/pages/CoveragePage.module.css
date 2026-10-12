@@ -1,0 +1,71 @@
+.panel { overflow: hidden; }
+
+.titleRed { color: var(--brand-red); }
+
+.block { padding: 26px 30px 30px; }
+
+.label {
+  margin-bottom: 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-red);
+}
+
+.story { margin-top: 28px; }
+.story:first-of-type { margin-top: 0; }
+
+.storyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.storyName { font-size: 17px; font-weight: 500; color: var(--text-primary); }
+
+.storyPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pillComplete { background: var(--green-tint); color: #2F7A22; }
+.pillGaps { background: var(--red-tint); color: var(--brand-red); }
+.pillDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.track {
+  height: 7px;
+  margin-top: 14px;
+  border-radius: var(--radius-pill);
+  background: #EDEDEE;
+  overflow: hidden;
+}
+
+.fill { height: 100%; border-radius: var(--radius-pill); }
+.fillComplete { background: var(--green); }
+.fillGaps { background: var(--brand-red); }
+
+.storyMeta { margin-top: 12px; font-size: 14px; color: var(--text-muted); }
+
+.statsBorder { border-top: 1px solid var(--line-soft); }
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 620px) {
+  .block { padding: 22px 18px 26px; }
+  .storyHead { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .actions { flex-direction: column; padding: 22px 18px 26px; }
+}

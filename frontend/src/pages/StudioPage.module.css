@@ -1,0 +1,94 @@
+.panel { overflow: hidden; }
+
+.block { padding: 32px 30px 36px; }
+
+.label {
+  margin-bottom: 20px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.patterns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.pattern {
+  display: flex;
+  flex-direction: column;
+  padding: 26px 26px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.patternFeatured { background: var(--red); border-color: var(--red); color: #FFFFFF; }
+
+.patternTitle { font-size: 20px; font-weight: 700; color: var(--ink); }
+.patternFeatured .patternTitle { color: #FFFFFF; }
+
+.chips { display: flex; align-items: center; gap: 10px; margin: 18px 0 20px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.arrow { color: var(--text-soft); font-size: 14px; }
+.patternFeatured .arrow { color: #FFFFFFD9; }
+
+.patternMeta { font-size: 14px; font-weight: 500; color: var(--text); }
+.patternFeatured .patternMeta { color: #FFFFFF; font-weight: 600; }
+
+.patternUsage { margin: 12px 0 22px; font-size: 13px; color: var(--text-soft); }
+.patternFeatured .patternUsage { color: #FFFFFFD1; }
+
+.patternActions { display: flex; gap: 12px; margin-top: auto; }
+
+.tableBlock { padding: 32px 30px 0; }
+
+.footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 34px 30px 38px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.footerText { max-width: 640px; }
+
+.footerTitle {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.footerBody { margin-top: 12px; color: var(--text-muted); font-size: 15px; line-height: 1.6; }
+
+.footerActions { display: flex; gap: 14px; flex: none; }
+
+@media (max-width: 1000px) {
+  .patterns { grid-template-columns: minmax(0, 1fr); }
+  .footer { flex-direction: column; gap: 22px; }
+}
+
+@media (max-width: 620px) {
+  .block, .tableBlock { padding: 24px 18px; }
+  .footer { padding: 26px 18px 30px; }
+  .footerTitle { font-size: 24px; }
+  .footerActions, .patternActions { flex-direction: column; width: 100%; }
+}

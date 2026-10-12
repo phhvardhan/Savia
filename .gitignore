@@ -1,0 +1,30 @@
+# secrets
+.env
+.env.*
+!.env.example
+certs/
+
+# deps / builds
+.venv/
+.venv-*/
+node_modules/
+node_modules.*/
+dist/
+
+# large / runtime data
+backend/uploads/
+backend/models/
+backend/data/
+*.mp3
+
+# caches / OS
+__pycache__/
+*.pyc
+.pytest_cache/
+.deepeval/
+.DS_Store
+__MACOSX/
+*.log
+
+# real user/meeting records, recreated empty by core/storage.py
+backend/app/data/*.data.txt

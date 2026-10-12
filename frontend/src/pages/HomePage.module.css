@@ -1,0 +1,428 @@
+/* Accent colours, applied per item via a modifier class ------------------ */
+.accentYellow  { --accent: #FFED26; }
+.accentMagenta { --accent: #FF26B7; }
+.accentAmber   { --accent: #FF9A26; }
+.accentOrange  { --accent: #EB7D00; }
+.accentGreen   { --accent: #40AF0C; }
+.accentBlue    { --accent: #0E43C9; }
+.accentRed     { --accent: #EB1700; }
+.accentTagBlue { --accent: #005EEB; }
+.accentTagGreen{ --accent: #0DC93F; }
+
+/* Hero -------------------------------------------------------------------- */
+.hero {
+  background: var(--hero-gradient);
+  color: #FFFFFF;
+  height: 553px;
+padding: 80px 0 30px;
+  text-align: center;
+}
+
+.heroTitle {
+  font-family: var(--font-display);
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 106%;
+  letter-spacing: -0.01em;
+  text-align: center;
+  color: #FFFFFF;
+}
+
+.heroBody {
+  margin: 18px auto 0;
+  max-width: 760px;
+  font-size: 17px;
+  line-height: 140%;
+  letter-spacing: 0;
+  text-align: center;
+  color: #FFFFFFD9;
+}
+
+.finder {
+  margin: 34px auto 0;
+  max-width: 900px;
+  min-height: 166px;
+  padding: 18px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  background:
+    linear-gradient(#FFFFFF, #FFFFFF) padding-box,
+    var(--border-gradient) border-box;
+  text-align: left;
+  box-shadow: 0px 18px 44px -10px #4D050052;
+}
+
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.tab { font-family: var(--font-sans); }
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 33px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 140%;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Hover darkens to red and keeps the label white, so the active tab stays
+   legible instead of turning white-on-white. */
+.tab:hover,
+.tab:hover.tabActive {
+  background: var(--red-dark);
+  color: #FFFFFF;
+}
+
+.tabActive {
+  background: #EB1700;
+  color: #FFFFFF;
+  box-shadow: 0px 4px 12px 0px #005EEB1F;
+}
+
+.glyph {
+  width: 16px;
+  height: 16px;
+  border: 1px dashed #D7D4D0;
+  border-radius: 3px;
+  background: var(--chip);
+  flex: none;
+}
+
+/* Holds the input-mode icon; colour follows the tab label. */
+.tabIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--icon);
+}
+/* Hover fills the tab red, so the icon stays white with its label. */
+.tab:hover .tabIcon { color: #FFFFFF; }
+.tabActive .tabIcon { color: #FFFFFF; }
+
+.finderRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 0 4px 0 14px;
+}
+
+.finderInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 6px 0;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 140%;
+  color: var(--text-primary);
+  background: none;
+  resize: none;
+}
+.finderInput::placeholder { color: var(--text-soft); }
+
+/* No focus ring on the finder itself — the card frames it and the caret
+   shows where you are typing. */
+.finderInput:focus,
+.finderInput:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.finderGlyphs { display: flex; gap: 10px; flex: none; padding-top: 8px; }
+
+.finderButton { font-weight: 700; line-height: 140%; }
+
+/* Counters sitting on the hero */
+.counters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+  max-width: 1039px;
+  margin: 34px auto 0;
+  text-align: left;
+}
+
+.counter {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 86px;
+  padding: 18px 22px;
+  border-radius: var(--radius);
+  border-left: 4px solid var(--accent);
+  background: #FFFFFF;
+}
+
+.counterValue {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 106%;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.counterLabel {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 140%;
+  letter-spacing: 0;
+  color: var(--text-primary);
+}
+.counterHint {
+  margin-top: 4px;
+  font-family: var(--font-public);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 140%;
+  letter-spacing: 0;
+  color: var(--text-soft);
+}
+
+/* Shared section link ----------------------------------------------------- */
+.sectionLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--red);
+  font-size: 14px;
+  font-weight: 600;
+}
+.sectionLink:hover { text-decoration: underline; }
+
+/* What is running right now ----------------------------------------------- */
+.white { background: var(--surface); }
+
+.runs { display: grid; gap: 30px; }
+
+.run {
+  display: grid;
+  grid-template-columns: 1fr 190px 150px 20px;
+  align-items: center;
+  gap: 20px;
+  padding-left: 22px;
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+}
+
+.runTitle { font-size: 19px; font-weight: 700; color: var(--ink); }
+.runMeta { margin-top: 7px; font-size: 15px; color: var(--text-muted); }
+
+.metricLabel {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.metricValue { margin-top: 5px; font-size: 17px; font-weight: 700; color: var(--ink); }
+
+.chevron { color: var(--text-soft); font-size: 18px; justify-self: end; }
+
+/* What your team ran this week -------------------------------------------- */
+.tint { background: var(--surface-alt); }
+
+.ranGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 26px;
+}
+
+.ranCard { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+
+.ranImage { width: 100%; aspect-ratio: 234 / 102; object-fit: cover; }
+
+.ranBody { display: flex; flex-direction: column; flex: 1; padding: 22px 24px 24px; }
+
+.ranTitle { font-size: 18px; font-weight: 700; color: var(--ink); }
+
+.ranText { margin-top: 12px; font-size: 15px; line-height: 1.55; color: var(--text-muted); }
+
+.ranFoot { display: flex; align-items: center; gap: 14px; margin-top: 20px; }
+
+.stageTag {
+  display: inline-block;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+a.stageTag:hover { filter: brightness(0.9); }
+
+.ranUsage { color: var(--accent); font-size: 13px; font-weight: 600; }
+
+/* Closing band ------------------------------------------------------------ */
+.band { background: var(--ink); color: #FFFFFF; padding: 60px 0 66px; }
+
+.bandInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 48px;
+}
+
+.bandEyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #FFFFFFB8;
+}
+
+.bandTitle {
+  margin-top: 14px;
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.bandBody {
+  margin-top: 14px;
+  max-width: 620px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #FFFFFFB8;
+}
+
+@media (max-width: 1000px) {
+  .hero { height: auto; padding: 52px 0 34px; }
+  .heroTitle { font-size: 42px; }
+  .counters { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .run { grid-template-columns: 1fr auto; row-gap: 14px; }
+  .chevron { display: none; }
+  .ranGrid { grid-template-columns: minmax(0, 1fr); }
+  .bandInner { flex-direction: column; align-items: flex-start; gap: 26px; }
+  .bandTitle { font-size: 30px; }
+}
+
+@media (max-width: 620px) {
+  .heroTitle { font-size: 31px; }
+  .finder { padding: 14px 14px 18px; }
+  /* Give the description its own line so it is not squeezed by the button. */
+  .finderRow { flex-wrap: wrap; row-gap: 14px; padding-left: 8px; }
+  .finderInput { flex: 1 0 100%; font-size: 15px; }
+  .finderGlyphs { padding-top: 0; }
+  .run { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Finder actions beside the text area ------------------------------------- */
+.finderAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--icon);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.finderAction:hover {
+  border-color: var(--red);
+  background: var(--red-tint);
+  color: var(--red-dark);
+}
+
+.fileChosen {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 0 4px 0 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.fileChosen strong { font-weight: 600; color: var(--text-primary); word-break: break-all; }
+
+.fileRemove {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red-dark);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.finderButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Mic pulse listening animation */
+@keyframes micPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(235, 23, 0, 0.6); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(235, 23, 0, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(235, 23, 0, 0); }
+}
+
+.micListening {
+  background: #EB1700 !important;
+  color: #FFFFFF !important;
+  border-color: #EB1700 !important;
+  animation: micPulse 1.5s infinite;
+}
+
+.speechStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #EB1700;
+  margin-left: 8px;
+}
+
+.jiraCardPreview {
+  margin-top: 14px;
+  margin-left: 14px;
+  margin-right: 14px;
+  padding: 12px 16px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #F8FAFC;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.jiraCardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.jiraCardMeta {
+  font-size: 12px;
+  color: #64748B;
+  margin-top: 2px;
+}
+

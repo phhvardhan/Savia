@@ -1,0 +1,327 @@
+/* Top utility strip ------------------------------------------------------ */
+.topbar { background: var(--ink-deep); }
+
+.topbarInner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  height: 41px;
+  padding: 11px var(--header-gutter);
+}
+
+.topbarLink,
+.locale {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 148%;
+  color: #FFFFFF;
+  opacity: 0.82;
+}
+
+.locale { cursor: pointer; }
+
+.topbarLink:hover,
+.locale:hover { opacity: 1; }
+
+/* Masthead --------------------------------------------------------------- */
+.masthead { background: #FFFFFF; }
+
+.mastheadInner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+  height: 78px;
+  padding: 18px var(--header-gutter);
+}
+
+/* Logo lockup — the supplied wordmark, sized by height so it stays sharp. */
+.brand { display: flex; align-items: center; flex: none; }
+
+.brandMark {
+  width: auto;
+  height: 46px;
+  /* The artwork is 500x209; the browser needs no intrinsic ratio guesswork. */
+  object-fit: contain;
+}
+
+@media (max-width: 900px) {
+  .brandMark { height: 38px; }
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.brandEyebrow {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 130%;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--brand-red);
+}
+
+.brandName {
+  font-family: var(--font-public);
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 132%;
+  letter-spacing: -0.012em;
+  color: var(--text-primary);
+}
+
+/* Global search */
+.search {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 33px;
+  padding: 6px 6px 6px 18px;
+  background: #F8F9FA;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+}
+
+.searchIcon { display: flex; flex: none; color: var(--icon); }
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 152%;
+  color: var(--text);
+}
+.searchInput::placeholder { color: var(--text-tertiary); }
+.searchInput::-webkit-search-cancel-button { display: none; }
+
+.mastheadEnd { display: flex; flex-direction: row; align-items: center; gap: 16px; flex: none; }
+
+/* Prominent Start New Run Button */
+.newRunButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 6px;
+  background: #EB1700;
+  color: #FFFFFF;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid #EB1700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(235, 23, 0, 0.2);
+}
+
+.newRunButton:hover {
+  background: #D11300;
+  border-color: #D11300;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(235, 23, 0, 0.35);
+}
+
+.newRunButton:active {
+  transform: translateY(0);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--icon);
+  cursor: pointer;
+}
+.iconButton:hover { color: var(--ink); }
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex: none; }
+
+.who { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+
+.userGreeting {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 148%;
+  color: var(--text-tertiary);
+}
+
+.userRole {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #101418;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 148%;
+}
+
+/* Primary navigation ----------------------------------------------------- */
+.navbar {
+  height: 56px;                 /* 56 total, borders included */
+  background: var(--surface-canvas);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.navInner {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--header-gutter);
+}
+
+.navList { display: flex; align-items: stretch; gap: 36px; }
+
+.navList > li { display: flex; align-items: stretch; }
+
+/* Full height so the label centres in the bar; the active underline is drawn
+   as an overlay rather than a border, so it cannot shift the text up. */
+.navLink,
+.helpLink {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 148%;
+  color: var(--text-primary);
+}
+
+.navLink:hover,
+.helpLink:hover { color: var(--brand-red); }
+
+.navLinkActive { font-weight: 700; }
+
+.navLinkActive::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--brand-red);
+}
+
+.main { min-height: 60vh; }
+
+@media (max-width: 1100px) {
+  .navList { gap: 24px; }
+}
+
+@media (max-width: 900px) {
+  .mastheadInner { height: auto; flex-wrap: wrap; padding: 14px 0; gap: 16px; }
+  .search { order: 3; flex-basis: 100%; }
+  .mastheadEnd { margin-left: auto; }
+  .userGreeting, .userRole { display: none; }
+  /* One scrolling row: the primary links and the help link together. */
+  .navInner { align-items: stretch; justify-content: flex-start; gap: 28px; overflow-x: auto; scrollbar-width: none; }
+  .navList { flex: none; gap: 28px; }
+  .navInner::-webkit-scrollbar { display: none; }
+  .navLink, .helpLink { white-space: nowrap; }
+}
+
+@media (max-width: 560px) {
+  .brandName { font-size: 19px; }
+  .navList { gap: 18px; }
+}
+
+/* Account menu ----------------------------------------------------------- */
+.userArea { position: relative; }
+
+.userMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 50;
+  min-width: 232px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 14px 34px -12px #10141833;
+}
+
+.userMenuName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.userMenuMeta {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 140%;
+  color: var(--text-tertiary);
+  word-break: break-all;
+}
+
+.signOut {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.signOut:hover {
+  border-color: var(--red);
+  background: var(--red-tint);
+  color: var(--red-dark);
+}

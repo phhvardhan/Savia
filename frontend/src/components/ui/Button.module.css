@@ -1,0 +1,48 @@
+.base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.primary {
+  background: var(--red);
+  border-color: var(--red);
+  color: #FFFFFF;
+}
+.primary:hover { background: var(--red-dark); border-color: var(--red-dark); }
+
+.secondary {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+}
+.secondary:hover { border-color: #CFD2D5; background: #FBFBFC; }
+
+/* Sits on the red pattern card in Studio */
+.onRed {
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  color: var(--red);
+}
+.onRed:hover { background: #FDECEA; }
+
+.ghostOnRed {
+  background: transparent;
+  border-color: #FFFFFFD9;
+  color: #FFFFFF;
+}
+.ghostOnRed:hover { background: #FFFFFF24; }
+
+.pill { border-radius: var(--radius-pill); padding: 11px 24px; }
+
+.small { padding: 8px 16px; font-size: 13px; }

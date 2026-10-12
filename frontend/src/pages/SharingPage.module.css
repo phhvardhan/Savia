@@ -1,0 +1,144 @@
+.panel { overflow: hidden; }
+
+.block { padding: 24px 30px 26px; }
+
+.label {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #404040;
+}
+
+/* Add someone ------------------------------------------------------------- */
+.addRow { display: flex; align-items: center; gap: 12px; }
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.fieldIcon { display: flex; flex: none; color: var(--text-tertiary); }
+
+.fieldInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.fieldInput::placeholder { color: var(--text-tertiary); }
+.fieldInput:focus, .fieldInput:focus-visible { outline: none; }
+
+/* People ------------------------------------------------------------------ */
+.person { display: flex; align-items: center; gap: 12px; }
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--chip);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.personName { font-weight: 600; color: var(--text-primary); }
+.personRole { color: var(--text-muted); font-weight: 400; }
+
+.roleSelect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.caret { color: var(--text-soft); font-size: 10px; }
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.statusAsked { background: var(--red-tint); color: var(--brand-red); }
+.statusCommented { background: var(--green-tint); color: #2F7A22; }
+.statusIdle { background: var(--chip); color: var(--text-muted); }
+.statusDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* The approval ------------------------------------------------------------ */
+.approval {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 22px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #A81100 0%, #EB1700 100%);
+  color: #FFFFFF;
+}
+
+.approvalAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 8px;
+  background: #FFFFFF33;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.approvalText { flex: 1; min-width: 0; }
+
+.approvalTitle { font-size: 16px; font-weight: 700; }
+.approvalAge { font-weight: 400; color: #FFFFFFC7; }
+
+.approvalNote { margin-top: 8px; font-size: 14px; line-height: 150%; color: #FFFFFFE0; }
+
+.approvalActions { display: flex; gap: 12px; flex: none; }
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 900px) {
+  .block { padding: 22px 18px; }
+  .addRow { flex-wrap: wrap; }
+  .field { flex-basis: 100%; }
+  .approval { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .approvalActions { flex-wrap: wrap; }
+  .actions { flex-direction: column; padding: 22px 18px 26px; }
+}

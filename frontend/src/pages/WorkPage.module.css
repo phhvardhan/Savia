@@ -1,0 +1,101 @@
+.panel { overflow: hidden; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.agent {
+  display: flex;
+  flex-direction: column;
+  padding: 30px 32px 32px;
+  border-top: 1px solid var(--line-soft);
+  border-left: 1px solid var(--line-soft);
+}
+.agent:nth-child(-n + 2) { border-top: 0; }
+.agent:nth-child(odd) { border-left: 0; }
+
+.head { display: flex; align-items: flex-start; gap: 16px; }
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin-top: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--chip);
+  color: var(--icon);
+}
+
+.icon svg { width: 18px; height: 18px; }
+
+.headText { flex: 1; min-width: 0; }
+
+.name { font-size: 19px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+.nameMuted { color: var(--text-soft); }
+
+.stage {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.state { flex: none; margin-top: 2px; }
+
+.capabilities { margin: 22px 0 26px; display: grid; gap: 12px; }
+
+.capability {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.bullet { color: var(--red); font-weight: 700; line-height: 1.5; }
+
+.actions { display: flex; gap: 12px; margin-top: auto; }
+
+.footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 34px 32px 38px;
+  border-top: 1px solid var(--line);
+}
+
+.footerText { max-width: 620px; }
+
+.footerTitle {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.footerBody { margin-top: 12px; color: var(--text-muted); font-size: 15px; line-height: 1.6; }
+
+.footerActions { display: flex; gap: 14px; flex: none; }
+
+@media (max-width: 960px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .agent { border-left: 0; border-top: 1px solid var(--line-soft); padding: 24px 20px; }
+  .agent:first-child { border-top: 0; }
+  .agent:nth-child(2) { border-top: 1px solid var(--line-soft); }
+  .footer { flex-direction: column; gap: 22px; padding: 26px 20px 30px; }
+  .footerTitle { font-size: 24px; }
+}
+
+@media (max-width: 560px) {
+  .head { flex-wrap: wrap; }
+  .footerActions, .actions { flex-direction: column; width: 100%; }
+}

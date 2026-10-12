@@ -1,0 +1,74 @@
+.panel { overflow: hidden; }
+
+.block { padding: 24px 30px 28px; }
+.divider { border-top: 1px solid var(--line-soft); }
+
+.label {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #404040;
+}
+
+.failure {
+  padding: 20px 22px 22px;
+  border: 1px solid var(--brand-red);
+  border-radius: var(--radius);
+  background: var(--red-tint);
+}
+
+.failureHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.failureTitle { font-size: 16px; font-weight: 700; color: var(--brand-red); }
+
+.failedPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  color: var(--brand-red);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.failedDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.failureText { margin-top: 14px; font-size: 14px; line-height: 158%; color: var(--text-muted); }
+
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.verdictCorrect { background: var(--green); color: #FFFFFF; }
+.verdictGap { background: var(--brand-red); color: #FFFFFF; }
+.verdictConsequence { background: #E08A22; color: #FFFFFF; }
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 900px) {
+  .block { padding: 22px 18px 24px; }
+  .failureHead { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .actions { flex-direction: column; padding: 22px 18px 26px; }
+}

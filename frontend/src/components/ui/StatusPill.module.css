@@ -1,0 +1,46 @@
+/* Box and type come from the Figma status spec and are shared by every
+   status pill. Only the colours change with the status. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: 0px 4px 12px 0px #005EEB1F;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 140%;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+/* Tones — the background stays white; only the text and border carry the
+   status. Tinted fills are used only where explicitly asked for. */
+.alert { background: #FFFFFF; border: 1px solid #F6D9D4; color: var(--red); }
+.info { background: #FFFFFF; border: 1px solid #CFE0FB; color: #005EEB; }
+.running { background: #FFFFFF; border: 1px solid #F6D9D4; color: var(--brand-red); }
+.done { background: #FFFFFF; border: 1px solid #CFE7CB; color: #2F7A22; }
+.draft { background: #FFFFFF; border: 1px solid #F0DCC4; color: #C96A18; }
+.neutral { background: #FFFFFF; border: 1px solid var(--line); color: var(--text-muted); font-weight: 500; }
+.plain { background: #FFFFFF; color: var(--text-muted); font-weight: 500; }
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* Opt-in heartbeat for work that is still running. */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.dotPulse { animation: pulseDot 1.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dotPulse { animation: none; }
+}

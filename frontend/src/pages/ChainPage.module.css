@@ -1,0 +1,123 @@
+.panel { overflow: hidden; }
+
+.block { padding: 28px 30px 32px; }
+
+/* Columns ------------------------------------------------------------------- */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1fr) 96px minmax(0, 1fr);
+  gap: 0 8px;
+  align-items: start;
+}
+
+.column { min-width: 0; }
+
+.columnLabel {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #4C4C4C;
+}
+
+.columnLabelRed { color: var(--brand-red); }
+
+.stack { display: flex; flex-direction: column; gap: 20px; }
+
+/* One stage's card ------------------------------------------------------------ */
+.stageCard {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.stageLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #005EEB;
+}
+
+.stageTitle { margin-top: 6px; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stateAvailable { background: var(--green-tint); color: #2F7A1E; }
+.stateComingSoon { background: var(--chip); color: var(--text-muted); }
+.stateRunning { background: var(--red-tint); color: var(--brand-red); }
+.stateInReview { background: #FDECD3; color: #C96A18; }
+
+.stateDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* Approval gates --------------------------------------------------------- */
+.gateColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  height: 100%;
+  padding-top: 40px;
+}
+
+.gate {
+  padding: 10px 14px;
+  border: 1.5px solid var(--brand-red);
+  border-radius: 999px;
+  text-align: center;
+  white-space: nowrap;
+  background: var(--surface-canvas);
+}
+
+.gateLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-red);
+}
+
+.gateText { margin-top: 2px; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+.statsBorder { border-top: 1px solid var(--line-soft); }
+
+/* Footer ------------------------------------------------------------------- */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.footerTitle {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--brand-red);
+}
+
+.footerBody { margin-top: 8px; max-width: 640px; font-size: 14px; line-height: 150%; color: var(--text-muted); }
+
+.footerActions { display: flex; gap: 12px; flex: none; }
+
+@media (max-width: 1000px) {
+  .columns { grid-template-columns: 1fr; gap: 28px; }
+  .gateColumn { flex-direction: row; flex-wrap: wrap; padding-top: 0; height: auto; gap: 12px; }
+  .block { padding: 22px 18px 26px; }
+  .footer { flex-direction: column; align-items: flex-start; gap: 20px; padding: 22px 18px 26px; }
+}

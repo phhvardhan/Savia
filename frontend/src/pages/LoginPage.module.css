@@ -1,0 +1,129 @@
+.page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 48px 16px;
+  background: var(--hero-gradient);
+}
+
+.panel {
+  width: 100%;
+  max-width: 460px;
+  padding: 40px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--border-gradient) border-box;
+  box-shadow: 0 18px 44px -10px #4D050052;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brandEyebrow {
+  font-family: var(--font-public);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--brand-red);
+}
+
+.title {
+  margin-top: 26px;
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 118%;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.body {
+  margin-top: 10px;
+  font-size: 15px;
+  line-height: 145%;
+  color: var(--text-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.error {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--red-tint);
+  font-size: 13px;
+  line-height: 140%;
+  color: var(--red-dark);
+}
+
+.submit {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.foot {
+  margin-top: 22px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+@media (max-width: 520px) {
+  .panel { padding: 28px 22px; }
+  .title { font-size: 26px; }
+}

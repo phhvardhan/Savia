@@ -1,0 +1,89 @@
+.panel { overflow: hidden; }
+
+.titleRed { color: var(--brand-red); }
+
+.block { padding: 24px 30px 28px; }
+.divider { border-top: 1px solid var(--line-soft); }
+
+.label {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #404040;
+}
+
+/* Where they go ----------------------------------------------------------- */
+.targets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.target {
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.targetChosen { border-color: #005EEB; background: #F4F8FE; }
+
+.targetHead { display: flex; align-items: center; gap: 14px; }
+
+/* Supplied product artwork, so no coloured tile behind it. */
+.logo {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  object-fit: contain;
+}
+
+.targetTitle { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+
+.targetText { margin-top: 12px; font-size: 14px; line-height: 150%; color: var(--text-muted); }
+
+.targetState {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+.stateChosen { background: #E6EFFD; color: #005EEB; }
+.stateAlso { background: var(--chip); color: var(--text-muted); }
+.stateDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.cases { color: var(--brand-red); font-weight: 700; }
+
+/* Footer ------------------------------------------------------------------ */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.footerTitle {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.footerBody { margin-top: 8px; font-size: 14px; line-height: 150%; color: var(--text-muted); }
+
+.footerActions { display: flex; gap: 12px; flex: none; }
+
+@media (max-width: 900px) {
+  .block { padding: 22px 18px 24px; }
+  .targets { grid-template-columns: minmax(0, 1fr); }
+  .footer { flex-direction: column; align-items: flex-start; gap: 20px; padding: 22px 18px 26px; }
+}
