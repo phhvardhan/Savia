@@ -45,3 +45,19 @@ export function useRun(): RunState {
   if (!context) throw new Error('useRun must be used inside a RunProvider');
   return context;
 }
+
+/**
+ * The agent output the review pages (Change, Suggestions, Decide) work on:
+ * the chosen agent's latest saved version for this workflow.
+ */
+export function useCurrentRun() {
+  const { upload, recommendation, selectedAgent, activeRun, agentRuns, saveAgentRun } = useRun();
+  const agentId = selectedAgent || recommendation?.primary_agent || null;
+  const runKey = agentId && upload ? `${agentId}:${upload.workflow_id}` : null;
+  const run = (runKey && (agentRuns[runKey] ?? (activeRun?.key === runKey ? activeRun.run : null))) || null;
+  const agent = recommendation?.recommended_agents.find((a) => a.agent === agentId) ?? null;
+  const save = (next: AgentRun) => {
+    if (runKey) saveAgentRun(runKey, next);
+  };
+  return { agentId, agent, run, save };
+}

@@ -5,6 +5,7 @@ import tempfile
 import av
 from pypdf import PdfReader
 from docx import Document
+from pptx import Presentation
 from app.core.config import settings
 from app.utils.logger import logger
 
@@ -310,6 +311,39 @@ def extract_docx(file_path: str) -> str:
     return "\n".join(p.text for p in doc.paragraphs if p.text)
 
 
+def _pptx_shape_text(shape) -> list[str]:
+    """Text from any shape: text boxes, tables, grouped shapes, SmartArt/diagrams."""
+    if getattr(shape, "has_text_frame", False) and shape.has_text_frame:
+        return [p.text.strip() for p in shape.text_frame.paragraphs if p.text.strip()]
+    if getattr(shape, "has_table", False) and shape.has_table:
+        rows = [" | ".join(c.text.strip().replace("\n", " ") for c in row.cells) for row in shape.table.rows]
+        rows = [r for r in rows if r.strip(" |")]
+        return ["[Table]\n" + "\n".join(rows)] if rows else []
+    if hasattr(shape, "shapes"):  # group: flowcharts, architecture boxes
+        return [t for sub in shape.shapes for t in _pptx_shape_text(sub)]
+    # SmartArt and other graphic frames keep their text only in the XML.
+    raw = " ".join(t.strip() for t in shape._element.itertext() if t and t.strip())
+    return [raw] if len(raw) > 2 else []
+
+
+def extract_pptx(file_path: str) -> str:
+    slides = []
+    for number, slide in enumerate(Presentation(file_path).slides, start=1):
+        title_shape = slide.shapes.title
+        title = title_shape.text.strip() if title_shape is not None and title_shape.has_text_frame else ""
+        lines = [
+            t
+            for shape in slide.shapes
+            if title_shape is None or shape.shape_id != title_shape.shape_id
+            for t in _pptx_shape_text(shape)
+        ]
+        if slide.has_notes_slide and slide.notes_slide.notes_text_frame.text.strip():
+            lines.append(f"Speaker notes: {slide.notes_slide.notes_text_frame.text.strip()}")
+        if title or lines:
+            slides.append(f"--- Slide {number}{': ' + title if title else ''} ---\n" + "\n".join(lines))
+    return "\n\n".join(slides) if slides else "[PowerPoint: No extractable text found]"
+
+
 def extract_pdf(file_path: str) -> str:
     reader = PdfReader(file_path)
     text_chunks = []
@@ -345,5 +379,7 @@ def extract_text_from_file(file_path: str, api_key: str | None = None) -> str:
         return extract_doc(file_path)
     if ext == ".pdf":
         return extract_pdf(file_path)
+    if ext == ".pptx":
+        return extract_pptx(file_path)
     raise ValueError(f"Unsupported file type: {ext}")
 

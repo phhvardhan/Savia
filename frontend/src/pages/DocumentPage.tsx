@@ -6,7 +6,6 @@ import { Section } from '../components/ui/Section';
 import { useRun } from '../state/run';
 import { useAttachment } from '../state/attachment';
 import { runAgent, type AgentRun } from '../lib/savia';
-import { resetOnce } from '../lib/once';
 import styles from './DocumentPage.module.css';
 
 type OutlineState = 'Traced' | 'Changed' | 'Needs you';
@@ -45,15 +44,8 @@ interface ActivityEvent {
 
 export function DocumentPage() {
   const navigate = useNavigate();
-  const { attachment, setAttachment } = useAttachment();
-  const { upload, selectedAgent, selectAgent, activeRun, agentRuns, saveAgentRun, recommendation, resetAll } = useRun();
-
-  const handleStartNewRun = () => {
-    resetAll();
-    setAttachment(null);
-    resetOnce();
-    navigate('/work');
-  };
+  const { attachment } = useAttachment();
+  const { upload, selectedAgent, selectAgent, activeRun, agentRuns, saveAgentRun, recommendation } = useRun();
 
   // Active section tracking & Global Edit state
   const [activeSection, setActiveSection] = useState<string>('sec-summary');
@@ -621,9 +613,6 @@ export function DocumentPage() {
                 </p>
               </div>
               <div className={styles.docActions}>
-                <Button small variant="secondary" onClick={handleStartNewRun} style={{ border: '1px solid #EB1700', color: '#EB1700' }}>
-                  + New Run
-                </Button>
                 <Button small variant="secondary" onClick={() => selectAgent('readiness-scoring')}>
                   Re-run Audit
                 </Button>
@@ -817,9 +806,6 @@ export function DocumentPage() {
                 </p>
               </div>
               <div className={styles.docActions}>
-                <Button small variant="secondary" onClick={handleStartNewRun} style={{ border: '1px solid #EB1700', color: '#EB1700' }}>
-                  + New Run
-                </Button>
                 <Button
                   small
                   className={isGlobalEdit ? styles.editModeBtnActive : ''}
@@ -1603,13 +1589,10 @@ export function DocumentPage() {
             </p>
           </div>
           <div className={styles.footerActions}>
-            <Button onClick={handleStartNewRun} style={{ border: '1px solid #EB1700', color: '#EB1700' }}>
-              Start New Run
-            </Button>
             <Button variant="primary" onClick={() => navigate('/change')}>
               Send for approval
             </Button>
-            <Button onClick={() => navigate('/plan')}>Back to Plan</Button>
+            <Button onClick={() => navigate('/reading')}>Back to recommendations</Button>
           </div>
         </div>
       </Card>

@@ -22,7 +22,7 @@ import {
   UploadIcon,
 } from '../components/ui/Icons';
 import { INPUT_MODES } from '../data/inputModes';
-import { ACCEPTED_FILES, attachmentFromFile, useAttachment } from '../state/attachment';
+import { ACCEPTED_FILES, attachmentFromFiles, useAttachment } from '../state/attachment';
 import styles from './LibraryPage.module.css';
 
 
@@ -101,10 +101,10 @@ export function LibraryPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileChosen(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const picked = Array.from(event.target.files ?? []);
+    if (!picked.length) return;
 
-    const next = attachmentFromFile(file);
+    const next = attachmentFromFiles(picked);
     setAttachment(next);
     setMode(next.kind === 'recording' ? 'Upload a recording' : 'Upload a document');
     event.target.value = '';
@@ -186,6 +186,7 @@ export function LibraryPage() {
                   type="file"
                   className="visually-hidden"
                   accept={ACCEPTED_FILES}
+                  multiple
                   onChange={handleFileChosen}
                 />
               </div>

@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Any, Optional
 from app.agents.base import BaseAgent
-from app.core.agent import call_llm
+from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
@@ -18,7 +18,7 @@ class UserStoryAgent(BaseAgent):
         requirements_text = input_data.get("normalized_input") or input_data.get("text") or ""
         mom_content = input_data.get("mom") or input_data.get("outputs", {}).get("mom") or {}
 
-        context_str = f"REQUIREMENTS INPUT:\n{requirements_text[:8000]}\n\n"
+        context_str = f"REQUIREMENTS INPUT:\n{fit_text(requirements_text, 8000)}\n\n"
         if mom_content:
             context_str += f"MOM CONTEXT:\n{json.dumps(mom_content)}\n"
 

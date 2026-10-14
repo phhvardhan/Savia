@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -8,9 +8,10 @@ import { StatusPill } from '../components/ui/StatusPill';
 import { StatGrid } from '../components/ui/StatGrid';
 import { Spinner } from '../components/ui/Spinner';
 import { Modal } from '../components/ui/Modal';
-import { agentMeta, summariseContent } from '../lib/savia';
+import { agentMeta, artifactExportUrl, summariseContent } from '../lib/savia';
 import type { RecommendedAgent, OutputPart } from '../lib/savia';
 import { useRun } from '../state/run';
+import { useConnectorEnds } from '../hooks/useConnectorEnds';
 import styles from './WritingPage.module.css';
 
 type SectionState = 'Done' | 'Writing' | 'Next';
@@ -67,7 +68,7 @@ export function WritingPage() {
 
   const steps: Array<{ id: string; title: string; state: SectionState; note?: string }> =
     phase === 'done'
-      ? parts.map((part) => ({ id: part.key, title: part.title, state: 'Done', note: part.detail }))
+      ? parts.map((part) => ({ id: part.key, title: part.title, state: 'Done' }))
       : [
           { id: 'context', title: 'Receive context packet', state: 'Done' },
           {
@@ -78,6 +79,18 @@ export function WritingPage() {
           },
           { id: 'write', title: 'Write output', state: 'Next' },
         ];
+
+  // Excel only makes sense when the output has tables (stories, actions, test cases…).
+  const hasTables = Boolean(
+    run && Object.values(run.content).some((v) => Array.isArray(v) && v.length > 0 && v.every(isObject)),
+  );
+  const download = (fmt: 'docx' | 'xlsx') => {
+    if (run) window.location.assign(artifactExportUrl(run.artifact_id, fmt));
+  };
+
+  const outputsRef = useRef<HTMLDivElement>(null);
+  const connectorRef = useRef<SVGSVGElement>(null);
+  const outputYs = useConnectorEnds(outputsRef, connectorRef, ':scope > button', [parts.length, phase]);
 
   // Render formatted HTML content inside Modal (NO raw JSON strings)
   const renderFormattedModalContent = (part: OutputPart) => {
@@ -242,8 +255,8 @@ export function WritingPage() {
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <path d="M0 25 C 45 25, 55 42, 100 42" fill="none" stroke="#C3C4C5" strokeWidth="0.7" />
-            <path d="M0 75 C 45 75, 55 52, 100 52" fill="none" stroke="#C3C4C5" strokeWidth="0.7" />
+            <path d="M0 25 C 45 25, 55 46, 100 46" fill="none" stroke="#C3C4C5" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+            <path d="M0 75 C 45 75, 55 54, 100 54" fill="none" stroke="#C3C4C5" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
           </svg>
 
           <section className={styles.orchestrator} aria-label="Agent progress">
@@ -286,23 +299,29 @@ export function WritingPage() {
           </section>
 
           <svg
+            ref={connectorRef}
             className={`${styles.connector} ${styles.connectorRight}`}
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <path d="M0 45 C 50 45, 50 25, 100 25" fill="none" stroke="#2E2AE0" strokeWidth="0.8" />
-            <path
-              d="M0 55 C 50 55, 50 72, 100 72"
-              fill="none"
-              stroke="#C3C4C5"
-              strokeWidth="0.7"
-              strokeDasharray="3 3"
-            />
+            {outputYs.map((end, i) => {
+              // Fan out from the middle of the agent box, one line per output card.
+              const start = 50 + (i - (outputYs.length - 1) / 2) * 4;
+              return (
+                <path
+                  key={i}
+                  d={`M0 ${start} C 50 ${start}, 50 ${end}, 100 ${end}`}
+                  fill="none"
+                  stroke="#C3C4C5"
+                  strokeWidth="1.2"
+                  vectorEffect="non-scaling-stroke"
+                />
+              );
+            })}
           </svg>
 
-          {/* Compact Scroll Container to prevent excessive vertical page height */}
-          <div className={styles.scrollContainer} style={{ gridRow: 2, gridColumn: 5 }}>
+          <div ref={outputsRef} className={styles.outputs}>
             {phase === 'error' && <div className={styles.recommendError}>{error}</div>}
 
             {phase === 'idle' && (
@@ -327,31 +346,20 @@ export function WritingPage() {
 
             {/* Non-empty produced parts */}
             {parts.map((part) => (
-              <div
+              <button
                 key={part.key}
-                className={styles.recommend}
-                style={{ cursor: 'pointer' }}
+                type="button"
+                className={`${styles.recommend} ${styles.outputCard}`}
                 onClick={() => setSelectedPart(part)}
               >
-                <div className={styles.outputHead}>
-                  <h3 className={styles.outputTitle}>{part.title}</h3>
-                  {part.count !== null && <Badge tone="solidGreen">{part.count} items</Badge>}
-                </div>
-                <p
-                  className={styles.recommendText}
-                  style={{
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                  }}
-                >
-                  {part.detail}
+                <h3 className={styles.outputTitle}>{part.title}</h3>
+                <p className={`${styles.recommendText} ${styles.outputDetail}`}>
+                  {part.count !== null ? `${part.count} items` : part.detail}
                 </p>
-                <div style={{ marginTop: '8px', fontSize: '12px', color: '#005EEB', fontWeight: 600 }}>
-                  Click to view formatted list →
-                </div>
-              </div>
+                <span className={styles.outputLink}>
+                  {part.count !== null ? 'View the list →' : 'Read it all →'}
+                </span>
+              </button>
             ))}
           </div>
         </div>
@@ -391,7 +399,9 @@ export function WritingPage() {
             <Button variant="primary" onClick={() => navigate('/document')}>
               View Full {meta ? `${meta.label} Document Canvas` : 'Document Editor'}
             </Button>
-            <Button onClick={() => navigate('/plan')}>Back to Plan</Button>
+            {run && <Button onClick={() => download('docx')}>Download Word</Button>}
+            {run && hasTables && <Button onClick={() => download('xlsx')}>Download Excel</Button>}
+            <Button onClick={() => navigate('/reading')}>Back to recommendations</Button>
           </div>
         </div>
       </Card>

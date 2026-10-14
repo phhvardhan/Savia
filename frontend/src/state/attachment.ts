@@ -2,8 +2,8 @@ import { createContext, useContext } from 'react';
 
 /** What the person attached on the home finder, carried across pages. */
 export interface Attachment {
-  /** The real File, kept so it can be posted to /ingestion/upload later. */
-  file: File;
+  /** The real Files, kept so they can be posted to /ingestion/upload later. */
+  files: File[];
   name: string;
   /** Bytes. */
   size: number;
@@ -32,17 +32,26 @@ export function formatBytes(bytes: number): string {
 }
 
 /** Extensions app/services/document_parser.py can actually read. */
-export const MEDIA_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.mp4', '.mov', '.avi', '.mkv'];
-export const DOC_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.md', '.csv', '.json', '.vtt', '.srt'];
+export const MEDIA_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.mp4', '.mov', '.avi', '.mkv', '.webm'];
+export const DOC_EXTENSIONS = ['.pdf', '.docx', '.doc', '.pptx', '.txt', '.md', '.csv', '.json', '.vtt', '.srt'];
 export const ACCEPTED_FILES = [...MEDIA_EXTENSIONS, ...DOC_EXTENSIONS].join(',');
 
 /** Describe a picked File the way every page wants to show it. */
-export function attachmentFromFile(file: File): Attachment {
-  const isMedia = MEDIA_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext));
+const isMedia = (file: File) =>
+  /^(audio|video)\//.test(file.type) || MEDIA_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext));
+
+export function attachmentFromFiles(files: File[]): Attachment {
   return {
-    file,
-    name: file.name,
-    size: file.size,
-    kind: isMedia ? 'recording' : 'document',
+    files,
+    name: files.length === 1 ? files[0].name : `${files[0].name} + ${files.length - 1} more`,
+    size: files.reduce((total, f) => total + f.size, 0),
+    kind: files.every(isMedia) ? 'recording' : 'document',
   };
+}
+
+/** Adds newly picked files to what is already attached, skipping exact repeats. */
+export function addFiles(current: Attachment | null, picked: File[]): Attachment {
+  const id = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
+  const existing = current?.files ?? [];
+  return attachmentFromFiles([...existing, ...picked.filter((f) => !existing.some((e) => id(e) === id(f)))]);
 }

@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Any, Optional
 from app.agents.base import BaseAgent
-from app.core.agent import call_llm
+from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
@@ -33,7 +33,7 @@ class Ddl3Agent(BaseAgent):
         stories_input = input_data.get("user_stories") or input_data.get("outputs", {}).get("user_stories") or {}
         existing_doc = input_data.get("existing_design_doc") or {}
 
-        context_str = f"USE CASE: {use_case}\nDOCUMENT TYPE: {document_type}\n\nREQUIREMENTS:\n{text_input[:6000]}\n\n"
+        context_str = f"USE CASE: {use_case}\nDOCUMENT TYPE: {document_type}\n\nREQUIREMENTS:\n{fit_text(text_input, 6000)}\n\n"
         if stories_input:
             context_str += f"USER STORIES:\n{json.dumps(stories_input)[:3000]}\n\n"
         if existing_doc:

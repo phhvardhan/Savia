@@ -33,6 +33,8 @@ export function RunProvider({ children }: { children: ReactNode }) {
 
   const saveAgentRun = useCallback((key: string, run: AgentRun) => {
     setAgentRuns((current) => ({ ...current, [key]: run }));
+    // Pages read the active run first, so an edited version must replace it there too.
+    setActiveRun((current) => (current && current.key === key ? { ...current, status: 'done', run } : current));
   }, []);
 
   const startAgentRun = useCallback(

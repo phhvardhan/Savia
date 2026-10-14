@@ -1,4 +1,4 @@
-import { request, uploadFile } from './api';
+import { API_BASE, request, uploadFile } from './api';
 
 /** Response of POST /ingestion/upload. */
 export interface UploadResult {
@@ -34,7 +34,10 @@ export interface Recommendation {
   primary_agent: string;
   primary_reason: string;
   missing_information: string[];
+  /** With source 'llm', a sentence on how to use the top agent; else a status code. */
   next_action: string;
+  /** 'llm' when an AI model chose the agents; 'keyword' when it fell back to keyword scoring. */
+  source?: 'llm' | 'keyword';
 }
 
 /**
@@ -173,8 +176,8 @@ export function planCost(agents: RecommendedAgent[]) {
   };
 }
 
-export function ingestFile(file: File): Promise<UploadResult> {
-  return uploadFile<UploadResult>('/ingestion/upload', file);
+export function ingestFile(files: File[]): Promise<UploadResult> {
+  return uploadFile<UploadResult>('/ingestion/upload', files);
 }
 
 /** Response of POST /ingestion/analyze. */
@@ -336,4 +339,79 @@ export function summariseContent(content: Record<string, unknown>): OutputPart[]
         fullText: text,
       };
     });
+}
+
+/** Direct download link for an agent's output as a styled Word or Excel file. */
+export function artifactExportUrl(artifactId: string, fmt: 'docx' | 'xlsx'): string {
+  return `${API_BASE}/workflows/artifacts/${encodeURIComponent(artifactId)}/export.${fmt}`;
+}
+
+/** POST /workflows/artifacts/{id}/suggest-edit — an AI draft of one section, not yet saved. */
+export interface EditSuggestion {
+  section: string;
+  original: unknown;
+  revised: unknown;
+  summary: string;
+  /** Statements in the revision the source input does not support. */
+  unsupported_claims: string[];
+  /** Questions Savia needs answered instead of guessing; the section is left unchanged. */
+  needs_info: string[];
+}
+
+export function suggestEdit(artifactId: string, section: string, instruction: string): Promise<EditSuggestion> {
+  return request<EditSuggestion>(`/workflows/artifacts/${encodeURIComponent(artifactId)}/suggest-edit`, {
+    method: 'POST',
+    body: { section, instruction },
+  });
+}
+
+/** Saves an accepted section as a new artifact version (older versions are kept). */
+export function applyEdit(artifactId: string, section: string, value: unknown): Promise<AgentRun> {
+  return request<AgentRun>(`/workflows/artifacts/${encodeURIComponent(artifactId)}/apply-edit`, {
+    method: 'POST',
+    body: { section, value },
+  });
+}
+
+export interface OpenDecision {
+  question: string;
+  evidence: string;
+  section: string;
+  options: { title: string; text: string; cost: string }[];
+  /** 0 or 1 when the text points towards an option, else null. */
+  leaning: number | null;
+  leaning_reason: string;
+}
+
+export function findOpenDecisions(artifactId: string): Promise<{ decisions: OpenDecision[] }> {
+  return request<{ decisions: OpenDecision[] }>(
+    `/workflows/artifacts/${encodeURIComponent(artifactId)}/open-decisions`,
+    { method: 'POST' },
+  );
+}
+
+/** Readable plain text for any section value: strings, lists, records. */
+export function sectionText(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (Array.isArray(value)) return value.map((item) => `• ${sectionText(item).replace(/\n/g, '\n  ')}`).join('\n');
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0))
+      .map(([k, v]) => `${k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}: ${sectionText(v)}`)
+      .join('\n');
+  }
+  return String(value);
+}
+
+/** Section key → readable title, e.g. "action_items" → "Action items". */
+export function sectionTitle(key: string): string {
+  return key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+}
+
+/** Records a chosen option: adds it to the decisions, resolves the open question, saves a new version. */
+export function recordDecision(artifactId: string, question: string, chosenTitle: string, chosenText: string): Promise<AgentRun> {
+  return request<AgentRun>(`/workflows/artifacts/${encodeURIComponent(artifactId)}/record-decision`, {
+    method: 'POST',
+    body: { question, chosen_title: chosenTitle, chosen_text: chosenText },
+  });
 }

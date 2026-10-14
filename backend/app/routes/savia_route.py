@@ -34,7 +34,7 @@ async def savia_recommend_agent(payload: RecommendationRequest):
             input_type=input_type
         )
 
-    recommendation = savia_orchestrator.analyze_and_recommend(
+    recommendation = await savia_orchestrator.recommend(
         session=session,
         raw_text=raw_text,
         input_type=input_type,
@@ -62,7 +62,7 @@ async def savia_orchestrate(payload: dict):
             input_type=input_type
         )
 
-    rec = savia_orchestrator.analyze_and_recommend(session, raw_text, input_type)
+    rec = await savia_orchestrator.recommend(session, raw_text, input_type)
 
     return {
         "workflow": session.dict(),

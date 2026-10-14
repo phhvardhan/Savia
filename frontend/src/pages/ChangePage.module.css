@@ -97,6 +97,8 @@
   cursor: pointer;
 }
 .preset:hover { border-color: var(--brand-red); color: var(--brand-red); }
+.presetActive,
+.presetActive:hover { border-color: var(--brand-red); background: var(--red-tint); color: var(--brand-red); font-weight: 600; }
 
 /* Guardrails -------------------------------------------------------------- */
 .guardrails {

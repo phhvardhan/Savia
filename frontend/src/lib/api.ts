@@ -14,6 +14,7 @@
  */
 
 const BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
+export const API_BASE = BASE;
 
 const TOKEN_KEY = 'savia.token';
 
@@ -139,9 +140,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
  * Multipart POST for file ingestion. Kept separate from `request` because the
  * browser must set its own Content-Type so the multipart boundary is correct.
  */
-export async function uploadFile<T>(path: string, file: File): Promise<T> {
+export async function uploadFile<T>(path: string, files: File[]): Promise<T> {
   const body = new FormData();
-  body.append('file', file);
+  for (const file of files) body.append('files', file);
 
   const headers: Record<string, string> = {};
   const token = getToken();

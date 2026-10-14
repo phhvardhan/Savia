@@ -1,5 +1,7 @@
+import json
 from typing import List, Dict, Any
 from app.models.workflow import WorkflowSession, StageEnum
+from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
@@ -16,6 +18,43 @@ ALL_AGENTS = [
 
 UNMATCHED_CONFIDENCE = 0.40
 
+# What each agent produces, so the LLM chooses on purpose rather than on name.
+AGENT_PURPOSES = {
+    "mom": "Turns meeting transcripts, recordings or call notes into minutes, decisions and owned action items.",
+    "user-stories": "Turns requirements, BRDs or meeting outcomes into INVEST user stories with Given/When/Then acceptance criteria.",
+    "gap-analysis": "Compares requirements against what exists or is specified, producing a gap list and requirements traceability matrix (RTM).",
+    "ddl3": "Writes or updates a DDL3 detailed functional/technical design document from approved stories or architecture input.",
+    "kdd-package": "Assembles a Knowledge Design Document package for Design Authority Board (DAB) review from an architecture/design doc.",
+    "change-impact": "Assesses the impact of a proposed change across systems and workstreams, producing an interdependency matrix.",
+    "test": "Produces a test inventory and FIT/UAT test cases from approved designs or user stories.",
+    "readiness-scoring": "Scores a deliverable or spec for delivery readiness and SDLC/GxP audit compliance, with remediation points.",
+}
+
+LLM_INPUT_CHARS = 9000
+STAGE_VALUES = [s.value for s in StageEnum]
+
+RECOMMENDER_SYSTEM = (
+    "You are SAVIA, an assistant that reads what a delivery team has (a document, meeting transcript, "
+    "or a typed description) and recommends which SDLC agent(s) they should run next, and why.\n\n"
+    "AVAILABLE AGENTS (use these ids exactly):\n"
+    + "\n".join(f"- {aid}: {AGENT_PURPOSES[aid]}" for aid, _, _ in ALL_AGENTS)
+    + "\n\nRULES:\n"
+    "1. Rank the 3 agents that best fit this input, best first. Always return exactly 3 when the input "
+    "relates to software delivery, even if the 2nd or 3rd is a weak fit. Return an empty list only when "
+    "the input is unrelated to software delivery or too empty to judge.\n"
+    "2. confidence is your honest 0.0-1.0 estimate that each agent fits. Weaker fits get low values "
+    "(e.g. 0.2-0.5); do not inflate them to look good. If the input is vague, say what is missing.\n"
+    "3. reason: one or two sentences, specific to this input (quote or name what you saw). "
+    "No generic descriptions of the agent.\n"
+    "4. next_step: one short sentence telling the user how to use the top agent with what they gave. "
+    "Plain text, no markdown; name agents in words (e.g. 'the MOM agent'), not by id.\n"
+    f"5. lifecycle_stage: where this input sits, one of {STAGE_VALUES}.\n"
+    "6. missing_information: things the user should add for a better result (empty list if none).\n\n"
+    "Return only JSON in this shape:\n"
+    '{"recommendations": [{"agent": "<id>", "confidence": 0.0, "reason": "..."}], '
+    '"next_step": "...", "lifecycle_stage": "...", "missing_information": ["..."]}'
+)
+
 
 class SaviaOrchestrator:
     """
@@ -23,6 +62,106 @@ class SaviaOrchestrator:
     Analyzes normalized user input (Audio/Video/PDF/DOC/TXT), document titles,
     and SDLC context to recommend the optimal agent out of all 8 modular SDLC agents.
     """
+
+    async def recommend(
+        self,
+        session: WorkflowSession,
+        raw_text: str = None,
+        input_type: str = None,
+        filename: str = None,
+    ) -> Dict[str, Any]:
+        """LLM recommendation; falls back to keyword scoring if no provider answers."""
+        try:
+            return await self.recommend_with_llm(session, raw_text, input_type, filename)
+        except Exception as e:
+            logger.warning(f"[SAVIA Recommender] LLM unavailable ({e}); falling back to keyword scoring.")
+            result = self.analyze_and_recommend(session, raw_text, input_type, filename)
+            result["source"] = "keyword"
+            return result
+
+    async def recommend_with_llm(
+        self,
+        session: WorkflowSession,
+        raw_text: str = None,
+        input_type: str = None,
+        filename: str = None,
+    ) -> Dict[str, Any]:
+        text = raw_text or (session.normalized_input if session else "") or ""
+        i_type = input_type or (session.input_type if session else "unknown")
+        # Only outputs with content; the session pre-creates empty slots for every stage.
+        prior_outputs = sorted(k for k, v in (session.outputs or {}).items() if v) if session else []
+
+        # ponytail: 9000 chars shared fairly across files; summarise per file if long inputs pick badly.
+        user = (
+            f"FILENAME: {filename or '(typed by the user)'}\n"
+            f"INPUT TYPE: {i_type}\n"
+            f"ALREADY PRODUCED IN THIS WORKFLOW: {', '.join(prior_outputs) or 'nothing yet'}\n"
+            f"INPUT ({len(text)} chars{', truncated' if len(text) > LLM_INPUT_CHARS else ''}):\n"
+            f"{fit_text(text, LLM_INPUT_CHARS)}"
+        )
+        data = await call_llm(RECOMMENDER_SYSTEM, user, expected_type=dict)
+
+        agent_names = {a[0]: a[1] for a in ALL_AGENTS}
+        agent_inputs = {a[0]: a[2] for a in ALL_AGENTS}
+
+        recommended: List[Dict[str, Any]] = []
+        for item in data.get("recommendations") or []:
+            aid = str(item.get("agent", "")).strip()
+            if aid not in agent_names or any(r["agent"] == aid for r in recommended):
+                continue  # unknown id or duplicate from the model
+            try:
+                conf = float(item.get("confidence", 0))
+            except (TypeError, ValueError):
+                conf = 0.0
+            recommended.append({
+                "agent": aid,
+                "agent_name": agent_names[aid],
+                "reason": str(item.get("reason") or "").strip() or f"Fits {agent_names[aid]}.",
+                "required_inputs": agent_inputs[aid],
+                "confidence": round(min(max(conf, 0.0), 1.0), 2),
+                "matched": True,
+            })
+            if len(recommended) == 3:
+                break
+
+        if not recommended and not isinstance(data.get("recommendations"), list):
+            raise ValueError(f"LLM reply had no recommendations list: {json.dumps(data)[:300]}")
+
+        # An empty list is a real answer ("nothing fits yet"), not a failure.
+        recommended.sort(key=lambda r: r["confidence"], reverse=True)
+        primary = recommended[0] if recommended else None
+
+        for aid, name, inputs in ALL_AGENTS:
+            if not any(r["agent"] == aid for r in recommended):
+                recommended.append({
+                    "agent": aid,
+                    "agent_name": name,
+                    "reason": "Not a fit for this input; available if you want it in the plan.",
+                    "required_inputs": inputs,
+                    "confidence": 0.0,
+                    "matched": False,
+                })
+
+        stage = str(data.get("lifecycle_stage") or "").strip().lower()
+        if stage not in STAGE_VALUES:
+            stage = (session.current_stage if session else StageEnum.INGESTION).value
+
+        missing = [str(m) for m in (data.get("missing_information") or []) if str(m).strip()]
+
+        logger.info(
+            f"[SAVIA Recommender] LLM picked {[(r['agent'], r['confidence']) for r in recommended if r['matched']]}"
+        )
+        return {
+            "workflow_id": session.workflow_id if session else None,
+            "input_type": i_type,
+            "current_stage": stage,
+            "recommended_agents": recommended,
+            "primary_agent": primary["agent"] if primary else "",
+            "primary_reason": primary["reason"] if primary else "No agent fits this input yet.",
+            "missing_information": missing,
+            "next_action": str(data.get("next_step") or "").replace("**", "").strip() or "await_user_confirmation",
+            "source": "llm",
+        }
 
     def analyze_and_recommend(
         self,

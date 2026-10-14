@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Any, Optional
 from app.agents.base import BaseAgent
-from app.core.agent import call_llm
+from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
@@ -19,7 +19,7 @@ class TestAgent(BaseAgent):
         stories_input = input_data.get("user_stories") or input_data.get("outputs", {}).get("user_stories") or {}
         ddl3_input = input_data.get("ddl3") or input_data.get("outputs", {}).get("ddl3") or {}
 
-        context_str = f"REQUIREMENTS TEXT:\n{text_input[:5000]}\n\n"
+        context_str = f"REQUIREMENTS TEXT:\n{fit_text(text_input, 5000)}\n\n"
         if stories_input:
             context_str += f"USER STORIES & BDD ACCEPTANCE CRITERIA:\n{json.dumps(stories_input)[:4000]}\n\n"
         if ddl3_input:

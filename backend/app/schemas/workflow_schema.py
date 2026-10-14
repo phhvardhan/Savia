@@ -25,6 +25,8 @@ class RecommendationResponse(BaseModel):
     primary_reason: str
     missing_information: List[str]
     next_action: str
+    # "llm" when an AI model chose; "keyword" when it fell back to keyword scoring.
+    source: str = "keyword"
 
 
 class ApproveStageRequest(BaseModel):

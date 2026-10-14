@@ -19,6 +19,8 @@ class DocumentParserService:
             return "pdf"
         elif ext in {".docx", ".doc"}:
             return "doc"
+        elif ext == ".pptx":
+            return "pptx"
         elif ext in {".txt", ".md", ".csv", ".json", ".vtt", ".srt"}:
             return "txt"
         return "unstructured_text"

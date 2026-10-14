@@ -35,7 +35,7 @@ export const INPUT_MODES: InputModeMeta[] = [
     label: 'Upload a document',
     icon: DocumentIcon,
     kind: 'document',
-    acceptFiles: '.pdf,.docx,.doc,.txt,.md,.json',
+    acceptFiles: '.pdf,.docx,.doc,.pptx,.txt,.md,.json',
     placeholder: 'Attach a document file (PDF, DOCX, TXT) or describe its context here…',
     hint: 'Upload a functional specification, design document, or architecture document.',
   },

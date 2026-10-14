@@ -167,7 +167,7 @@ export function ChainPage() {
             </p>
           </div>
           <div className={styles.footerActions}>
-            <Button variant="primary" onClick={() => navigate('/start')}>
+            <Button variant="primary" onClick={() => navigate('/work')}>
               Show me for my requirement
             </Button>
             <Button onClick={() => navigate('/agents')}>Open an agent</Button>

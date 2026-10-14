@@ -69,9 +69,11 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       setError(null);
     };
 
+    // Whole session so far (finals + current interim), so callers can replace
+    // rather than append — appending interim results duplicates words.
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let currentTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i];
         if (result && result[0]) {
           currentTranscript += result[0].transcript;

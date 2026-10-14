@@ -1,5 +1,6 @@
 import os
 import tempfile
+from typing import List, Optional, Tuple
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
 from app.services.document_parser import document_parser
 from app.orchestration.workflow_engine import workflow_engine
@@ -8,45 +9,87 @@ from app.schemas.workflow_schema import WorkflowCreateRequest
 router = APIRouter()
 
 
-@router.post("/upload", tags=["Ingestion"])
-async def upload_document(file: UploadFile = File(...)):
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file filename provided.")
+MAX_FILES = 10  # ponytail: fixed cap; raise with care, every file is parsed (and audio transcribed) inline
 
-    temp_path = os.path.join(tempfile.gettempdir(), f"upload_{file.filename}")
+
+async def _parse_upload(upload: UploadFile) -> Tuple[str, str, dict]:
+    """Parse one uploaded file via a uniquely named temp copy (two files may share a name)."""
+    suffix = os.path.splitext(upload.filename or "")[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await upload.read())
+        temp_path = tmp.name
     try:
-        content = await file.read()
-        with open(temp_path, "wb") as f:
-            f.write(content)
-
-        normalized_text, input_type, metadata = await document_parser.parse_and_normalize(temp_path, file.filename)
-        
-        session = workflow_engine.create_workflow(
-            title=f"Workflow - {file.filename}",
-            source_documents=[metadata],
-            normalized_input=normalized_text,
-            input_type=input_type
-        )
-
-        return {
-            "workflow_id": session.workflow_id,
-            "filename": file.filename,
-            "input_type": input_type,
-            "metadata": metadata,
-            "normalized_text_snippet": normalized_text[:500],
-            "full_normalized_text": normalized_text,
-        }
+        return await document_parser.parse_and_normalize(temp_path, upload.filename)
     finally:
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+
+
+@router.post("/upload", tags=["Ingestion"])
+async def upload_document(
+    files: Optional[List[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),  # single-file clients keep working
+):
+    uploads = [f for f in (files or []) + ([file] if file else []) if f and f.filename]
+    if not uploads:
+        raise HTTPException(status_code=400, detail="No file provided.")
+    if len(uploads) > MAX_FILES:
+        raise HTTPException(status_code=400, detail=f"Upload at most {MAX_FILES} files at a time.")
+
+    parsed = []
+    for upload in uploads:
+        try:
+            parsed.append(await _parse_upload(upload))
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Could not read '{upload.filename}': {e}")
+
+    if len(parsed) == 1:
+        normalized_text, input_type, metadata = parsed[0]
+        source_documents = [metadata]
+    else:
+        # One header per file so agents and the recommender can tell files apart
+        # (and fit_text can give each a fair share of the context window).
+        total = len(parsed)
+        normalized_text = "\n\n".join(
+            f"===== FILE {i} of {total}: {meta['filename']} ({kind}) =====\n{text}"
+            for i, (text, kind, meta) in enumerate(parsed, start=1)
+        )
+        kinds = {kind for _, kind, _ in parsed}
+        input_type = kinds.pop() if len(kinds) == 1 else "mixed"
+        source_documents = [meta for _, _, meta in parsed]
+        metadata = {
+            "filename": ", ".join(m["filename"] for m in source_documents),
+            "input_type": input_type,
+            "file_size_bytes": sum(m["file_size_bytes"] for m in source_documents),
+            "character_count": len(normalized_text),
+            "word_count": sum(m["word_count"] for m in source_documents),
+            "file_count": total,
+            "files": source_documents,
+        }
+
+    first = uploads[0].filename
+    session = workflow_engine.create_workflow(
+        title=f"Workflow - {first}" + (f" + {len(uploads) - 1} more" if len(uploads) > 1 else ""),
+        source_documents=source_documents,
+        normalized_input=normalized_text,
+        input_type=input_type,
+    )
+
+    return {
+        "workflow_id": session.workflow_id,
+        "filename": metadata["filename"],
+        "input_type": input_type,
+        "metadata": metadata,
+        "normalized_text_snippet": normalized_text[:500],
+        "full_normalized_text": normalized_text,
+    }
 
 
 @router.post("/transcribe", tags=["Ingestion"])
 async def transcribe_media(file: UploadFile = File(...)):
-    return await upload_document(file=file)
+    return await upload_document(files=None, file=file)
 
 
 @router.post("/analyze", tags=["Requirement Understanding"])

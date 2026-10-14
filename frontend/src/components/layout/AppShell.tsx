@@ -70,6 +70,23 @@ export function AppShell({ children }: { children: ReactNode }) {
             />
           </NavLink>
 
+          <nav className={styles.nav} aria-label="Primary">
+            <ul className={styles.navList}>
+              {NAV_ITEMS.map((item) => (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    className={({ isActive }) =>
+                      isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
           <div className={styles.search}>
             <label className="visually-hidden" htmlFor="global-search">
               Search projects, agents, user stories, or a Jira key
@@ -98,6 +115,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               Start New Run
             </button>
 
+            <NavLink
+              to="/help"
+              className={({ isActive }) =>
+                isActive ? `${styles.iconButton} ${styles.iconButtonActive}` : styles.iconButton
+              }
+              aria-label="Help & guidance"
+              title="Help & guidance"
+            >
+              <HelpIcon />
+            </NavLink>
             <button type="button" className={styles.iconButton} aria-label="Notifications">
               <BellIcon />
             </button>
@@ -114,45 +141,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-
-      <nav className={styles.navbar} aria-label="Primary">
-        <div className={styles.navInner}>
-          <ul className={styles.navList}>
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  className={({ isActive }) =>
-                    isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <button
-              type="button"
-              className={styles.newRunButton}
-              style={{ height: '28px', padding: '0 10px', fontSize: '12px' }}
-              onClick={handleStartNewRun}
-              title="Reset everything and start fresh from document upload"
-            >
-              + New Run
-            </button>
-            <NavLink
-              to="/help"
-              className={({ isActive }) =>
-                isActive ? `${styles.helpLink} ${styles.navLinkActive}` : styles.helpLink
-              }
-            >
-              <HelpIcon />
-              Help &amp; guidance
-            </NavLink>
-          </div>
-        </div>
-      </nav>
 
       <main className={styles.main}>{children}</main>
     </>

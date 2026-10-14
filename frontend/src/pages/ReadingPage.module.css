@@ -6,8 +6,10 @@
 /* Board ------------------------------------------------------------------- */
 .board {
   display: grid;
-  /* Side columns are sized to their content; the middle takes the rest. */
-  grid-template-columns: 252px 76px minmax(0, 1fr) 76px 240px;
+  /* The orchestrator keeps its 296px first; the input column then grows with
+     the file name into whatever room is left (max 360px), and the name wraps
+     past that instead of running under the orchestrator. */
+  grid-template-columns: fit-content(360px) 76px minmax(296px, 1fr) 76px 240px;
   align-items: stretch;
   padding: 34px 30px 40px;
 }
@@ -30,12 +32,14 @@
   grid-row: 2;
   grid-column: 1;
   display: grid;
-  grid-template-rows: repeat(2, 1fr);
+  /* One row per card present, so a lone input card sits level with the box. */
+  grid-auto-rows: 1fr;
   gap: 22px;
 }
 
 .inputCard {
   align-self: center;
+  min-width: 0;
   padding: 20px 22px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -44,9 +48,10 @@
 
 .inputHead {
   display: flex;
+  flex-wrap: wrap;   /* a long name pushes the badge under it rather than squeezing */
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 8px 14px;
 }
 
 .inputTitle {
@@ -54,7 +59,11 @@
   font-weight: 700;
   line-height: 140%;
   color: var(--text-primary);
+  min-width: 0;
+  /* Unspaced names (Bandicam_20260916_105526.mp4) still break instead of overflowing. */
+  overflow-wrap: anywhere;
 }
+.inputHead > :last-child { flex: none; }
 .inputMeta { margin-top: 14px; font-size: 14px; line-height: 148%; color: var(--text-muted); }
 .inputList { margin-top: 10px; display: grid; gap: 8px; }
 
@@ -165,7 +174,10 @@
   gap: 14px;
 }
 
+.recommends > li { min-width: 0; }
+
 .recommend {
+  min-width: 0;
   padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -187,9 +199,9 @@
 }
 
 .recommendTitle {
+  min-width: 0;
   font-size: 17px;
   font-weight: 700;
-  white-space: nowrap;
   color: var(--text-primary);
 }
 .recommendChosen .recommendTitle { color: #FFFFFF; }
@@ -217,6 +229,21 @@
 
 .statsBorder { border-top: 1px solid var(--line-soft); }
 
+/* Plan table (merged in from the old Plan page) */
+.rank { font-weight: 700; color: var(--brand-red); }
+.approvalPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--red-tint);
+  color: var(--brand-red);
+  font-size: 13px;
+  font-weight: 600;
+}
+.approvalDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
 /* Footer ------------------------------------------------------------------ */
 .footer {
   display: flex;
@@ -238,6 +265,10 @@
 .footerBody { margin-top: 10px; font-size: 15px; line-height: 148%; color: var(--text-muted); }
 
 .footerActions { display: flex; gap: 14px; flex: none; }
+
+@media (max-width: 1240px) {
+  .board { grid-template-columns: fit-content(360px) 40px minmax(296px, 1fr) 40px 240px; }
+}
 
 @media (max-width: 1080px) {
   .board {
@@ -360,6 +391,7 @@
 
 .recommendButton .recommendHead {
   display: flex;
+  flex-wrap: wrap;   /* a long agent name pushes "Chosen" down instead of out of the card */
   align-items: center;
   justify-content: space-between;
   gap: 12px;

@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Any, Optional
 from app.agents.base import BaseAgent
-from app.core.agent import call_llm
+from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
@@ -23,7 +23,7 @@ class KddPackageAgent(BaseAgent):
         text_input = input_data.get("normalized_input") or input_data.get("text") or ""
         ddl3_input = input_data.get("ddl3") or input_data.get("outputs", {}).get("ddl3") or {}
 
-        context_str = f"ARCHITECTURE SPECIFICATION:\n{text_input[:4000]}\n\n"
+        context_str = f"ARCHITECTURE SPECIFICATION:\n{fit_text(text_input, 4000)}\n\n"
         if ddl3_input:
             context_str += f"DESIGN SPECIFICATION:\n{json.dumps(ddl3_input)[:3000]}\n\n"
 

@@ -3,120 +3,107 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
-import { useRun } from '../state/run';
+import { useCurrentRun } from '../state/run';
+import { agentLabel, sectionText, sectionTitle } from '../lib/savia';
 import styles from './ChangePage.module.css';
 
-const PRESETS = [
-  'Shorten',
-  'Expand',
-  'Make it clearer',
-  'Restructure',
-  'Update from the approved story',
-  'Match the template',
-];
+const PRESETS = ['Shorten', 'Expand', 'Make it clearer', 'Restructure'];
 
 const GUARDRAILS = [
   {
     id: 'scope',
-    title: 'It only touches what you selected',
-    text: 'The rest of the document is untouched, including all accepted sections.',
+    title: 'It only touches the section you pick',
+    text: 'Every other section of the output stays exactly as it is.',
   },
   {
     id: 'preview',
     title: 'It shows you the change first',
-    text: 'Nothing is applied until you accept it, line by line or all at once.',
+    text: 'Nothing is saved until you accept it, and the previous version is kept.',
   },
   {
     id: 'facts',
     title: 'It will not invent facts',
-    text: 'If your instruction needs something not in the source transcript, it asks instead of guessing.',
+    text: 'If your instruction needs something that is not in your input, it asks instead of guessing.',
   },
 ];
 
 export function ChangePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { upload, selectedAgent, activeRun, agentRuns, recommendation } = useRun();
+  const { run, agent } = useCurrentRun();
 
-  const agentId = selectedAgent || recommendation?.primary_agent || 'mom';
-  const workflowId = upload?.workflow_id ?? 'default';
-  const runKey = `${agentId}:${workflowId}`;
-  const cachedRun = agentRuns[runKey];
-  const runContent = activeRun?.run?.content || cachedRun?.content || {};
-
-  // Extract selected passage or default dynamically from current agent's run content
-  const locationState = (location.state as { passage?: string; sectionTitle?: string; defaultInstruction?: string }) || {};
-
-  const getDynamicDefaultPassage = () => {
-    if (locationState.passage) return locationState.passage;
-    if (agentId === 'test') {
-      const firstTc = Array.isArray(runContent.test_cases) && runContent.test_cases[0];
-      if (firstTc) {
-        return `${firstTc.test_case_id} · ${firstTc.title}\nPreconditions: ${Array.isArray(firstTc.preconditions) ? firstTc.preconditions.join('; ') : firstTc.preconditions || 'None'}\nExpected Result: ${firstTc.expected_result}`;
-      }
-      return 'Manual test case and execution step specifications generated from approved requirements and user stories.';
-    }
-    if (agentId === 'ddl3') {
-      return (runContent.purpose as string) || (runContent.scope as string) || (runContent.title as string) || 'Functional and technical architecture specification derived from approved requirements.';
-    }
-    if (agentId === 'readiness-scoring') {
-      return (runContent.summary as string) || 'Multi-dimensional delivery readiness quality score evaluation and SDLC compliance audit breakdown.';
-    }
-    return (runContent.summary as string) || 'Executive summary and action items matrix derived from meeting transcript.';
-  };
-
-  const defaultPassage = getDynamicDefaultPassage();
-
-  const sectionTitle =
-    locationState.sectionTitle ||
-    (agentId === 'test'
-      ? 'Manual Test Cases Matrix'
-      : agentId === 'ddl3'
-      ? 'Objective, Purpose & Scope'
-      : agentId === 'readiness-scoring'
-      ? 'Score Justification & Audit Findings'
-      : 'Executive Summary & Discussion Points');
-
-  const defaultInstruction =
-    locationState.defaultInstruction ||
-    (agentId === 'test'
-      ? 'Add boundary validation checks and refine expected outcomes'
-      : agentId === 'ddl3'
-      ? 'Make technical interfaces and business rules more concise'
-      : agentId === 'readiness-scoring'
-      ? 'Elaborate on remediation action plan milestones'
-      : 'Shorten this executive summary and highlight key decisions');
-
-  const [instruction, setInstruction] = useState<string>(defaultInstruction);
+  // Every non-empty section, skipping alias keys that repeat an earlier one
+  // (MOM stores decisions under both "decisions" and "decisions_finalized").
+  const sections = Object.entries(run?.content ?? {}).filter(
+    ([, value], i, all) =>
+      value !== null &&
+      value !== '' &&
+      !(Array.isArray(value) && value.length === 0) &&
+      all.findIndex(([, other]) => JSON.stringify(other) === JSON.stringify(value)) === i,
+  );
+  const requested = (location.state as { section?: string } | null)?.section;
+  const [section, setSection] = useState<string>(
+    () => sections.find(([key]) => key === requested)?.[0] ?? sections.find(([, v]) => typeof v === 'string' && v.length > 80)?.[0] ?? sections[0]?.[0] ?? '',
+  );
+  const [instruction, setInstruction] = useState('');
+  const current = sections.find(([key]) => key === section);
+  const sectionIndex = sections.findIndex(([key]) => key === section) + 1;
 
   const handleAskSavia = () => {
-    navigate('/suggestions', {
-      state: {
-        passage: defaultPassage,
-        instruction,
-        sectionTitle,
-        agentId,
-      },
-    });
+    if (!section || !instruction.trim()) return;
+    navigate('/suggestions', { state: { section, instruction: instruction.trim() } });
   };
+
+  if (!run) {
+    return (
+      <Section id="change" title="Tell SAVIA what to change, in your words" size="compact">
+        <Card panel className={styles.panel}>
+          <div className={styles.block}>
+            <p>There is no agent output to change yet. Run an agent from the recommendations first.</p>
+          </div>
+          <div className={styles.actions}>
+            <Button variant="primary" onClick={() => navigate('/reading')}>
+              Back to recommendations
+            </Button>
+          </div>
+        </Card>
+      </Section>
+    );
+  }
 
   return (
     <Section
       id="change"
       title="Tell SAVIA what to change, in your words"
       size="compact"
-      subtitle="Select any passage and ask. Savia drafts the change and shows you the side-by-side diff before applying."
+      subtitle={`Pick a section of the ${agent ? agentLabel(agent) : 'agent'} output and say what to change. Savia drafts it and shows you before anything is saved.`}
     >
       <Card panel className={styles.panel}>
         <div className={styles.block}>
-          <h2 className={styles.label}>The passage you selected</h2>
+          <h2 className={styles.label}>Pick the section</h2>
+          <div className={styles.presets} role="radiogroup" aria-label="Section to change">
+            {sections.map(([key]) => (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={key === section}
+                className={`${styles.preset} ${key === section ? styles.presetActive : ''}`}
+                onClick={() => setSection(key)}
+              >
+                {sectionTitle(key)}
+              </button>
+            ))}
+          </div>
 
           <div className={styles.passage}>
             <div className={styles.passageHead}>
-              <span className={styles.passageNum}>4</span>
-              <h3 className={styles.passageTitle}>{sectionTitle}</h3>
+              <span className={styles.passageNum}>{sectionIndex}</span>
+              <h3 className={styles.passageTitle}>{sectionTitle(section)}</h3>
             </div>
-            <p className={styles.quote}>{defaultPassage}</p>
+            <p className={styles.quote} style={{ whiteSpace: 'pre-wrap' }}>
+              {current ? sectionText(current[1]) : ''}
+            </p>
           </div>
 
           <div className={styles.ask}>
@@ -141,9 +128,10 @@ export function ChangePage() {
                 className={styles.askInput}
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
-                placeholder="Type your instruction to Savia AI..."
+                placeholder="e.g. Shorten this and lead with the decisions"
+                onKeyDown={(e) => e.key === 'Enter' && handleAskSavia()}
               />
-              <Button variant="primary" small onClick={handleAskSavia}>
+              <Button variant="primary" small onClick={handleAskSavia} disabled={!instruction.trim()}>
                 Ask Savia
               </Button>
             </div>
@@ -154,7 +142,7 @@ export function ChangePage() {
                   key={preset}
                   type="button"
                   className={styles.preset}
-                  onClick={() => setInstruction(`${preset} section content`)}
+                  onClick={() => setInstruction(`${preset} this section`)}
                 >
                   {preset}
                 </button>
@@ -176,7 +164,7 @@ export function ChangePage() {
         </div>
 
         <div className={styles.actions}>
-          <Button variant="primary" onClick={handleAskSavia}>
+          <Button variant="primary" onClick={handleAskSavia} disabled={!instruction.trim()}>
             Ask Savia
           </Button>
           <Button onClick={() => navigate('/document')}>Edit it myself instead</Button>

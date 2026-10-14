@@ -35,7 +35,7 @@
 .locale:hover { opacity: 1; }
 
 /* Masthead --------------------------------------------------------------- */
-.masthead { background: #FFFFFF; }
+.masthead { background: #FFFFFF; border-bottom: 1px solid var(--border-subtle); }
 
 .mastheadInner {
   display: flex;
@@ -165,7 +165,8 @@
   color: var(--icon);
   cursor: pointer;
 }
-.iconButton:hover { color: var(--ink); }
+.iconButton:hover,
+.iconButtonActive { color: var(--brand-red); }
 
 .user {
   display: flex;
@@ -199,32 +200,18 @@
   line-height: 148%;
 }
 
-/* Primary navigation ----------------------------------------------------- */
-.navbar {
-  height: 56px;                 /* 56 total, borders included */
-  background: var(--surface-canvas);
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-}
+/* Primary navigation (inline in the masthead) --------------------------- */
+/* Bleeds through the masthead's vertical padding so the active underline sits
+   on the header's bottom edge. */
+.nav { display: flex; align-self: stretch; margin: -18px 0; flex: none; }
 
-.navInner {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 24px;
-  width: 100%;
-  height: 100%;
-  padding: 0 var(--header-gutter);
-}
-
-.navList { display: flex; align-items: stretch; gap: 36px; }
+.navList { display: flex; align-items: stretch; gap: 28px; }
 
 .navList > li { display: flex; align-items: stretch; }
 
 /* Full height so the label centres in the bar; the active underline is drawn
    as an overlay rather than a border, so it cannot shift the text up. */
-.navLink,
-.helpLink {
+.navLink {
   position: relative;
   display: flex;
   align-items: center;
@@ -238,8 +225,7 @@
   color: var(--text-primary);
 }
 
-.navLink:hover,
-.helpLink:hover { color: var(--brand-red); }
+.navLink:hover { color: var(--brand-red); }
 
 .navLinkActive { font-weight: 700; }
 
@@ -256,7 +242,8 @@
 .main { min-height: 60vh; }
 
 @media (max-width: 1100px) {
-  .navList { gap: 24px; }
+  .mastheadInner { gap: 20px; }
+  .navList { gap: 20px; }
 }
 
 @media (max-width: 900px) {
@@ -264,11 +251,10 @@
   .search { order: 3; flex-basis: 100%; }
   .mastheadEnd { margin-left: auto; }
   .userGreeting, .userRole { display: none; }
-  /* One scrolling row: the primary links and the help link together. */
-  .navInner { align-items: stretch; justify-content: flex-start; gap: 28px; overflow-x: auto; scrollbar-width: none; }
-  .navList { flex: none; gap: 28px; }
-  .navInner::-webkit-scrollbar { display: none; }
-  .navLink, .helpLink { white-space: nowrap; }
+  /* Links drop to their own scrolling row under logo + actions. */
+  .nav { order: 4; flex-basis: 100%; margin: 0; height: 40px; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .navLink { white-space: nowrap; }
 }
 
 @media (max-width: 560px) {

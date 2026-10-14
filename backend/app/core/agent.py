@@ -1,3 +1,4 @@
+import re
 import json
 import os
 import socket
@@ -401,10 +402,37 @@ async def ping_groq(api_key: Optional[str] = None) -> None:
 
 MAX_TRANSCRIPT_CHARS = 10000
 
+# Multi-file uploads are joined with one header per file (see ingestion_route).
+FILE_HEADER_RE = re.compile(r"^===== FILE \d+ of \d+: .* =====$", re.MULTILINE)
+
+
+def fit_text(text: str, limit: int) -> str:
+    """Trim text to `limit` chars. For multi-file input, every file gets a fair
+    share (unused share passes to the others) instead of the first file eating
+    the whole budget."""
+    if len(text) <= limit:
+        return text
+    starts = [m.start() for m in FILE_HEADER_RE.finditer(text)]
+    if len(starts) < 2:
+        return text[:limit]
+    parts = [text[a:b] for a, b in zip(starts, starts[1:] + [len(text)])]
+    budget, remaining = limit, len(parts)
+    shares = {}
+    for i in sorted(range(len(parts)), key=lambda i: len(parts[i])):  # smallest first
+        shares[i] = min(len(parts[i]), budget // remaining)
+        budget -= shares[i]
+        remaining -= 1
+    return "\n".join(
+        parts[i][: shares[i]] + ("\n[...rest of this file omitted for length...]" if shares[i] < len(parts[i]) else "")
+        for i in range(len(parts))
+    )
+
 
 async def truncate_transcript(transcript: str) -> str:
     if len(transcript) <= MAX_TRANSCRIPT_CHARS:
         return transcript
+    if len(FILE_HEADER_RE.findall(transcript)) > 1:
+        return fit_text(transcript, MAX_TRANSCRIPT_CHARS)
     half = MAX_TRANSCRIPT_CHARS // 2
     return (
         transcript[:half]
@@ -584,7 +612,7 @@ async def score_document_ai(
     selected_dimensions: Optional[List[str]] = None,
     api_key: Optional[str] = None,
 ) -> dict:
-    sample_text = document_text[:9000] if document_text else "No content provided."
+    sample_text = fit_text(document_text, 9000) if document_text else "No content provided."
 
     # Match or fallback to default rubric config
     rubric_conf = RUBRIC_CONFIGS.get(rubric)
@@ -749,7 +777,7 @@ async def generate_sdlc_document_ai(
     included_sections: Optional[List[str]] = None,
     api_key: Optional[str] = None,
 ) -> dict:
-    sample_text = source_context[:10000] if source_context else ""
+    sample_text = fit_text(source_context, 10000) if source_context else ""
     sections_req = ", ".join(included_sections) if included_sections else "Executive Summary, Scope, Functional Requirements, Non-Functional SLAs, Security & Compliance, Dependencies & Assumptions"
 
     system = (
@@ -851,7 +879,7 @@ async def generate_jira_stories_ai(
     options: Optional[List[str]] = None,
     api_key: Optional[str] = None,
 ) -> dict:
-    sample_text = source_context[:10000] if source_context else ""
+    sample_text = fit_text(source_context, 10000) if source_context else ""
     p_key = (project_key or "PROJ").strip().upper()
 
     system = (

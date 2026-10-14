@@ -10,7 +10,6 @@ import { DocumentPage } from './pages/DocumentPage';
 import { HelpPage } from './pages/HelpPage';
 import { HomePage } from './pages/HomePage';
 import { LibraryPage } from './pages/LibraryPage';
-import { PlanPage } from './pages/PlanPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { WritingPage } from './pages/WritingPage';
 import { SharingPage } from './pages/SharingPage';
@@ -30,7 +29,6 @@ import { StalePage } from './pages/StalePage';
 import { RefreshPlanPage } from './pages/RefreshPlanPage';
 import { ChainPage } from './pages/ChainPage';
 import { MissingInfoPage } from './pages/MissingInfoPage';
-import { StartPage } from './pages/StartPage';
 import { StudioPage } from './pages/StudioPage';
 import { WorkPage } from './pages/WorkPage';
 
@@ -43,9 +41,7 @@ function AppRoutes() {
         <Route path="/" element={<Navigate to="/work" replace />} />
         <Route path="/work" element={<HomePage />} />
         <Route path="/agents" element={<WorkPage />} />
-        <Route path="/start" element={<StartPage />} />
         <Route path="/reading" element={<ReadingPage />} />
-        <Route path="/plan" element={<PlanPage />} />
         <Route path="/writing" element={<WritingPage />} />
         <Route path="/document" element={<DocumentPage />} />
         <Route path="/change" element={<ChangePage />} />

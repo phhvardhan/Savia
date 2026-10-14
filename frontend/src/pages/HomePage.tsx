@@ -6,7 +6,14 @@ import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
 import { ArrowRightIcon, MicIcon, UploadIcon } from '../components/ui/Icons';
 import { INPUT_MODES, type InputModeMeta } from '../data/inputModes';
-import { attachmentFromFile, useAttachment } from '../state/attachment';
+import {
+  ACCEPTED_FILES,
+  addFiles,
+  attachmentFromFiles,
+  DOC_EXTENSIONS,
+  MEDIA_EXTENSIONS,
+  useAttachment,
+} from '../state/attachment';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import {
   fetchDashboardSummary,
@@ -64,7 +71,7 @@ const INITIAL_RAN_THIS_WEEK: WeeklyRun[] = [
     title: 'Minutes and actions',
     text: 'Turned a 90-minute design workshop into 6 decisions and 8 owned actions',
     stage: 'Requirements',
-    stageHref: '/start',
+    stageHref: '/work',
     usage: 'Used 4 times this week',
     image: '/assets/ran1.jpg',
     accent: styles.accentRed,
@@ -106,13 +113,15 @@ export function HomePage() {
 
   // File attachments & Web Speech API
   const { attachment, setAttachment } = useAttachment();
-  const documentInputRef = useRef<HTMLInputElement>(null);
-  const recordingInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Text already in the box when dictation started; the live transcript is appended to it.
+  const dictationBaseRef = useRef('');
 
   const {
     isListening,
     transcript,
     hasSupport: hasSpeechSupport,
+    error: speechError,
     startListening,
     stopListening,
   } = useSpeechRecognition();
@@ -157,12 +166,26 @@ export function HomePage() {
     };
   }, []);
 
-  // Update prompt whenever speech recognition outputs new transcript text
+  // Live dictation: base text + everything heard so far. Ignored once the user
+  // has switched away from Speak (e.g. by typing), so late results can't clobber edits.
   useEffect(() => {
-    if (transcript) {
-      setPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    if (transcript && activeModeMeta.kind === 'speak') {
+      const base = dictationBaseRef.current;
+      setPrompt(base ? `${base} ${transcript}` : transcript);
     }
-  }, [transcript]);
+  }, [transcript, activeModeMeta.kind]);
+
+  const beginDictation = () => {
+    dictationBaseRef.current = prompt.trim();
+    startListening();
+  };
+
+  const openFilePicker = (accept: string) => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.accept = accept;
+    input.click();
+  };
 
   // Handle Tab Switch
   const handleSelectMode = (modeMeta: InputModeMeta) => {
@@ -170,16 +193,16 @@ export function HomePage() {
 
     if (modeMeta.kind === 'speak') {
       if (!isListening && hasSpeechSupport) {
-        startListening();
+        beginDictation();
       }
     } else if (isListening) {
       stopListening();
     }
 
     if (modeMeta.kind === 'document') {
-      documentInputRef.current?.click();
+      openFilePicker(DOC_EXTENSIONS.join(','));
     } else if (modeMeta.kind === 'recording') {
-      recordingInputRef.current?.click();
+      openFilePicker(`audio/*,video/*,${MEDIA_EXTENSIONS.join(',')}`);
     }
   };
 
@@ -189,24 +212,20 @@ export function HomePage() {
     if (isListening) {
       stopListening();
     } else {
-      startListening();
+      beginDictation();
     }
   };
 
   // Handle file picker selection for document / video recording
-  const handleFileChosen = (event: React.ChangeEvent<HTMLInputElement>, kind: 'document' | 'recording') => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFileChosen = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(event.target.files ?? []);
+    if (!picked.length) return;
 
-    const nextAttachment = attachmentFromFile(file);
-    // Ensure kind reflects document or recording video/audio
-    if (kind === 'recording') {
-      nextAttachment.kind = 'recording';
-    }
+    // Adds to what is already attached; the tab follows what is attached overall.
+    const nextAttachment = addFiles(attachment, picked);
+    if (isListening) stopListening();
     setAttachment(nextAttachment);
-    setActiveModeMeta(
-      INPUT_MODES.find((m) => m.kind === (kind === 'recording' ? 'recording' : 'document')) || INPUT_MODES[2]
-    );
+    setActiveModeMeta(INPUT_MODES.find((m) => m.kind === nextAttachment.kind) || INPUT_MODES[2]);
 
     event.target.value = '';
   };
@@ -242,10 +261,19 @@ export function HomePage() {
 
   const handleFindAgents = () => {
     if (activeModeMeta.kind === 'jira' && jiraKeyInput) {
-      navigate('/start', { state: { jiraKey: jiraKeyInput, jiraIssue: jiraPreview } });
-    } else {
-      navigate('/start', { state: { prompt, attachment, mode: activeModeMeta.kind } });
+      // ponytail: Jira keys aren't ingested yet; /reading shows "Nothing attached" until it is.
+      navigate('/reading', { state: { jiraKey: jiraKeyInput, jiraIssue: jiraPreview } });
+      return;
     }
+    if (isListening) stopListening();
+    // Typed or dictated text rides the same upload path as a file, so the
+    // backend creates a real workflow every later page can use.
+    // Typed or dictated text travels with any files instead of being dropped.
+    if (prompt.trim()) {
+      const text = new File([prompt.trim()], 'Your description.txt', { type: 'text/plain' });
+      setAttachment(attachment ? attachmentFromFiles([...attachment.files, text]) : attachmentFromFiles([text]));
+    }
+    navigate('/reading');
   };
 
   const isFormValid =
@@ -316,7 +344,10 @@ export function HomePage() {
                       : activeModeMeta.placeholder
                   }
                   value={prompt}
-                  onChange={(event) => setPrompt(event.target.value)}
+                  onChange={(event) => {
+                    setPrompt(event.target.value);
+                    if (activeModeMeta.kind !== 'describe') handleSelectMode(INPUT_MODES[0]);
+                  }}
                 />
               )}
 
@@ -338,34 +369,13 @@ export function HomePage() {
                   className={styles.finderAction}
                   aria-label="Upload a document or recording"
                   title="Upload a file"
-                  onClick={() => {
-                    if (activeModeMeta.kind === 'recording') {
-                      recordingInputRef.current?.click();
-                    } else {
-                      documentInputRef.current?.click();
-                    }
-                  }}
+                  onClick={() => openFilePicker(ACCEPTED_FILES)}
                 >
                   <UploadIcon />
                 </button>
 
-                {/* Hidden Document File Input */}
-                <input
-                  ref={documentInputRef}
-                  type="file"
-                  className="visually-hidden"
-                  accept=".pdf,.docx,.doc,.txt,.md,.json"
-                  onChange={(e) => handleFileChosen(e, 'document')}
-                />
-
-                {/* Hidden Recording (Video/Audio) File Input */}
-                <input
-                  ref={recordingInputRef}
-                  type="file"
-                  className="visually-hidden"
-                  accept="video/*,audio/*,.mp4,.webm,.mov,.m4a,.mp3,.wav"
-                  onChange={(e) => handleFileChosen(e, 'recording')}
-                />
+                {/* Hidden file input; `accept` is set by whichever button opens it */}
+                <input ref={fileInputRef} type="file" multiple className="visually-hidden" onChange={handleFileChosen} />
               </div>
 
               <Button
@@ -379,6 +389,20 @@ export function HomePage() {
                 <ArrowRightIcon />
               </Button>
             </div>
+
+            {activeModeMeta.kind === 'speak' && (!hasSpeechSupport || speechError) && (
+              <p className={styles.fileChosen} role="alert">
+                {!hasSpeechSupport
+                  ? 'Voice dictation needs Chrome, Edge or Safari. Type instead, or upload a recording.'
+                  : speechError?.includes('not-allowed') || speechError?.includes('service-not-allowed')
+                    ? 'Microphone access is blocked. Allow it from the icon in the address bar, then click the mic again.'
+                    : speechError?.includes('network')
+                      ? "Couldn't reach the browser's speech service. Check your connection or VPN, then try again."
+                      : speechError?.includes('no-speech')
+                        ? "Didn't hear anything. Click the mic and try again."
+                        : speechError}
+              </p>
+            )}
 
             {/* Jira Card Preview if Jira Mode active */}
             {activeModeMeta.kind === 'jira' && jiraPreview && (
@@ -403,11 +427,23 @@ export function HomePage() {
             {/* Attached File Pill */}
             {attachment && (
               <p className={styles.fileChosen}>
-                Attached ({attachment.kind === 'recording' ? 'Video/Audio Recording' : 'Document'}):{' '}
-                <strong>{attachment.name}</strong>
-                <button type="button" className={styles.fileRemove} onClick={() => setAttachment(null)}>
-                  Remove
-                </button>
+                Attached ({attachment.files.length} file{attachment.files.length === 1 ? '' : 's'}):{' '}
+                {attachment.files.map((f, i) => (
+                  <span key={`${f.name}:${f.lastModified}`}>
+                    <strong>{f.name}</strong>
+                    <button
+                      type="button"
+                      className={styles.fileRemove}
+                      aria-label={`Remove ${f.name}`}
+                      onClick={() => {
+                        const rest = attachment.files.filter((_, j) => j !== i);
+                        setAttachment(rest.length ? attachmentFromFiles(rest) : null);
+                      }}
+                    >
+                      Remove
+                    </button>{' '}
+                  </span>
+                ))}
               </p>
             )}
           </div>

@@ -49,6 +49,10 @@
   background: var(--surface-canvas);
 }
 
+.optionButton { display: block; width: 100%; font: inherit; color: inherit; text-align: left; }
+.optionButton .optionText,
+.optionButton .cost { display: block; }  /* spans inside a button */
+
 .optionLeaning {
   border-color: var(--brand-red);
   background: var(--red-tint);
