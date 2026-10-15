@@ -1,0 +1,28 @@
+Northwind Pharma - Input for detailed design: WMS-to-SAP stock event interface
+
+Approved user stories
+US-01  As a supply planner, I want WMS stock movements reflected in SAP within 5 minutes, so that availability is accurate.
+US-02  As an integration support analyst, I want to be alerted within 15 minutes when a stock posting fails, so that I can fix it before planners notice.
+US-03  As an integration support analyst, I want to re-post a failed movement, so that I don't need IT to change data.
+
+Agreed architecture
+- Manhattan WMS publishes a StockMovement event per pick, putaway or adjustment.
+- The integration layer (SAP Integration Suite) receives the event, validates it and posts it to SAP S/4HANA using the standard goods movement BAPI (BAPI_GOODSMVT_CREATE).
+- Failed postings go to an error queue; an alert email goes to the integration support mailbox.
+
+StockMovement event fields (from the WMS team)
+- movement_id (string, unique)
+- material_number (string, 18 chars)
+- plant (string, 4 chars, "NL01" for Rotterdam)
+- storage_location (string, 4 chars)
+- quantity (decimal, > 0)
+- unit_of_measure (string)
+- movement_type (PICK | PUTAWAY | ADJUST)
+- event_time (ISO-8601 timestamp)
+
+Validation rules
+- Reject events with quantity <= 0.
+- Reject events for any plant other than NL01 during the pilot.
+- Ignore a movement_id that was already posted (duplicates).
+
+Not decided yet: the retry policy for failed postings (how many retries and at what interval).

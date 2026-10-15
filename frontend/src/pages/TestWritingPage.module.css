@@ -169,7 +169,7 @@
   gap: 12px;
 }
 
-.outputTitle { font-size: 17px; font-weight: 700; color: #EB7D00; }
+.outputTitle { font-size: 17px; font-weight: 700; color: var(--brand-red); }
 .outputTitleMuted { color: var(--text-primary); }
 .outputState { flex: none; font-size: 13px; color: var(--text-soft); }
 .recommendChosen .outputTitle { color: #FFFFFF; }

@@ -2,33 +2,16 @@ import json
 from typing import List, Dict, Any
 from app.models.workflow import WorkflowSession, StageEnum
 from app.core.agent import call_llm, fit_text
+from app.agents import AGENTS
 from app.utils.logger import logger
 
 
-ALL_AGENTS = [
-    ("mom", "MOM & Action Items Agent", ["normalized_text"]),
-    ("user-stories", "Agile User Stories & Backlog Epics Agent", ["approved_requirements_or_mom"]),
-    ("gap-analysis", "Requirement Gap Analysis & Traceability Matrix (RTM) Agent", ["business_objectives_and_specs"]),
-    ("ddl3", "DDL3 Design Agent", ["approved_user_stories_or_architecture"]),
-    ("kdd-package", "KDD Package (Knowledge Design Document) for DAB Agent", ["architecture_design_doc"]),
-    ("change-impact", "Change Impact Assessment & Interdependency Matrix Agent", ["current_and_target_architecture"]),
-    ("test", "Test Automation & Inventory Agent", ["approved_design_or_user_stories"]),
-    ("readiness-scoring", "Delivery Readiness Scoring & SDLC Audit Agent", ["deliverables_or_spec"]),
-]
+ALL_AGENTS = [(agent.id, agent.name, agent.required_inputs) for agent in AGENTS]
 
 UNMATCHED_CONFIDENCE = 0.40
 
 # What each agent produces, so the LLM chooses on purpose rather than on name.
-AGENT_PURPOSES = {
-    "mom": "Turns meeting transcripts, recordings or call notes into minutes, decisions and owned action items.",
-    "user-stories": "Turns requirements, BRDs or meeting outcomes into INVEST user stories with Given/When/Then acceptance criteria.",
-    "gap-analysis": "Compares requirements against what exists or is specified, producing a gap list and requirements traceability matrix (RTM).",
-    "ddl3": "Writes or updates a DDL3 detailed functional/technical design document from approved stories or architecture input.",
-    "kdd-package": "Assembles a Knowledge Design Document package for Design Authority Board (DAB) review from an architecture/design doc.",
-    "change-impact": "Assesses the impact of a proposed change across systems and workstreams, producing an interdependency matrix.",
-    "test": "Produces a test inventory and FIT/UAT test cases from approved designs or user stories.",
-    "readiness-scoring": "Scores a deliverable or spec for delivery readiness and SDLC/GxP audit compliance, with remediation points.",
-}
+AGENT_PURPOSES = {agent.id: agent.purpose for agent in AGENTS}
 
 LLM_INPUT_CHARS = 9000
 STAGE_VALUES = [s.value for s in StageEnum]
@@ -39,8 +22,8 @@ RECOMMENDER_SYSTEM = (
     "AVAILABLE AGENTS (use these ids exactly):\n"
     + "\n".join(f"- {aid}: {AGENT_PURPOSES[aid]}" for aid, _, _ in ALL_AGENTS)
     + "\n\nRULES:\n"
-    "1. Rank the 3 agents that best fit this input, best first. Always return exactly 3 when the input "
-    "relates to software delivery, even if the 2nd or 3rd is a weak fit. Return an empty list only when "
+    "1. Rank the 5 agents that best fit this input, best first. Always return exactly 5 when the input "
+    "relates to software delivery, even if the later ones are weak fits. Return an empty list only when "
     "the input is unrelated to software delivery or too empty to judge.\n"
     "2. confidence is your honest 0.0-1.0 estimate that each agent fits. Weaker fits get low values "
     "(e.g. 0.2-0.5); do not inflate them to look good. If the input is vague, say what is missing.\n"
@@ -121,7 +104,7 @@ class SaviaOrchestrator:
                 "confidence": round(min(max(conf, 0.0), 1.0), 2),
                 "matched": True,
             })
-            if len(recommended) == 3:
+            if len(recommended) == 5:
                 break
 
         if not recommended and not isinstance(data.get("recommendations"), list):
@@ -189,16 +172,7 @@ class SaviaOrchestrator:
             f"type='{i_type}', stage='{current_stage.value}'"
         )
 
-        scores: Dict[str, float] = {
-            "mom": 0.0,
-            "user-stories": 0.0,
-            "gap-analysis": 0.0,
-            "ddl3": 0.0,
-            "kdd-package": 0.0,
-            "change-impact": 0.0,
-            "test": 0.0,
-            "readiness-scoring": 0.0,
-        }
+        scores: Dict[str, float] = {aid: 0.0 for aid, _, _ in ALL_AGENTS}
 
         reasons: Dict[str, str] = {}
 
@@ -234,8 +208,8 @@ class SaviaOrchestrator:
             if any(k in doc_name_lower for k in [
                 "user_stories", "user_story", "stories", "backlog", "jira", "epics", "brd", "prd"
             ]):
-                scores["user-stories"] += 30.0
-                reasons["user-stories"] = f"Document '{doc_name}' indicates Agile User Stories & Backlog Epics."
+                scores["agile-stories"] += 30.0
+                reasons["agile-stories"] = f"Document '{doc_name}' indicates Agile User Stories & Backlog Epics."
 
             # Meeting Minutes
             if any(k in doc_name_lower for k in [
@@ -248,8 +222,8 @@ class SaviaOrchestrator:
             if any(k in doc_name_lower for k in [
                 "readiness", "scorecard", "audit", "sdlc_audit", "quality_gate", "gxp_audit"
             ]):
-                scores["readiness-scoring"] += 30.0
-                reasons["readiness-scoring"] = f"Document '{doc_name}' indicates a Delivery Readiness Audit or Quality Scorecard."
+                scores["readiness-audit"] += 30.0
+                reasons["readiness-audit"] = f"Document '{doc_name}' indicates a Delivery Readiness Audit or Quality Scorecard."
 
             # Gap Analysis
             if any(k in doc_name_lower for k in [
@@ -269,8 +243,8 @@ class SaviaOrchestrator:
             if any(k in doc_name_lower for k in [
                 "kdd", "dab", "design_authority", "architecture_dossier"
             ]):
-                scores["kdd-package"] += 30.0
-                reasons["kdd-package"] = f"Document '{doc_name}' indicates a KDD Package for Design Authority Board review."
+                scores["kdd-dab"] += 30.0
+                reasons["kdd-dab"] = f"Document '{doc_name}' indicates a KDD Package for Design Authority Board review."
 
         # ---------------------------------------------------------------------
         # 2. INPUT TYPE SIGNALS
@@ -314,9 +288,9 @@ class SaviaOrchestrator:
         story_sig_count = count_matches(story_signatures)
         story_sup_count = count_matches(story_supporting)
         if story_sig_count > 0 or story_sup_count >= 2:
-            scores["user-stories"] += story_sig_count * 7.0 + story_sup_count * 2.0
-            if "user-stories" not in reasons:
-                reasons["user-stories"] = "The requirement context contains functional capabilities suitable for INVEST user stories and BDD acceptance criteria."
+            scores["agile-stories"] += story_sig_count * 7.0 + story_sup_count * 2.0
+            if "agile-stories" not in reasons:
+                reasons["agile-stories"] = "The requirement context contains functional capabilities suitable for INVEST user stories and BDD acceptance criteria."
 
         # DDL3 Design
         ddl3_signatures = [
@@ -370,9 +344,9 @@ class SaviaOrchestrator:
         read_sig_count = count_matches(readiness_signatures)
         read_sup_count = count_matches(readiness_supporting)
         if read_sig_count > 0 or read_sup_count >= 2:
-            scores["readiness-scoring"] += read_sig_count * 7.0 + read_sup_count * 2.0
-            if "readiness-scoring" not in reasons:
-                reasons["readiness-scoring"] = "The input contains deliverables requiring multi-dimensional quality scorecards, GxP compliance audit, and readiness scoring."
+            scores["readiness-audit"] += read_sig_count * 7.0 + read_sup_count * 2.0
+            if "readiness-audit" not in reasons:
+                reasons["readiness-audit"] = "The input contains deliverables requiring multi-dimensional quality scorecards, GxP compliance audit, and readiness scoring."
 
         # Gap Analysis & RTM
         gap_signatures = [
@@ -401,6 +375,19 @@ class SaviaOrchestrator:
             if "change-impact" not in reasons:
                 reasons["change-impact"] = "The input demands cross-platform impact analysis and interdependency matrix evaluation."
 
+        # Solution Analyzer
+        solution_signatures = [
+            "problem statement", "solution blueprint", "solution design", "proposed solution",
+            "solution options", "how should we solve", "pain point"
+        ]
+        solution_supporting = ["problem", "solution", "pain", "challenge", "root cause", "improve"]
+        sol_sig_count = count_matches(solution_signatures)
+        sol_sup_count = count_matches(solution_supporting)
+        if sol_sig_count > 0 or sol_sup_count >= 3:
+            scores["solution-analyzer"] += sol_sig_count * 7.0 + sol_sup_count * 2.0
+            if "solution-analyzer" not in reasons:
+                reasons["solution-analyzer"] = "The input describes a problem that needs a proposed solution design."
+
         # KDD Package for DAB
         kdd_signatures = [
             "knowledge design document", "kdd package", "design authority board",
@@ -410,15 +397,15 @@ class SaviaOrchestrator:
         kdd_sig_count = count_matches(kdd_signatures)
         kdd_sup_count = count_matches(kdd_supporting)
         if kdd_sig_count > 0 or kdd_sup_count >= 2:
-            scores["kdd-package"] += kdd_sig_count * 7.0 + kdd_sup_count * 2.0
-            if "kdd-package" not in reasons:
-                reasons["kdd-package"] = "The input involves architecture governance dossiers tailored for Design Authority Board (DAB) review."
+            scores["kdd-dab"] += kdd_sig_count * 7.0 + kdd_sup_count * 2.0
+            if "kdd-dab" not in reasons:
+                reasons["kdd-dab"] = "The input involves architecture governance dossiers tailored for Design Authority Board (DAB) review."
 
         # Upstream / downstream pipeline stage synergy
         if session and session.outputs:
-            if session.outputs.get("mom") and scores["user-stories"] > 0:
-                scores["user-stories"] += 5.0
-            if session.outputs.get("user_stories") and scores["ddl3"] > 0:
+            if session.outputs.get("mom") and scores["agile-stories"] > 0:
+                scores["agile-stories"] += 5.0
+            if session.outputs.get("agile_stories") and scores["ddl3"] > 0:
                 scores["ddl3"] += 5.0
             if session.outputs.get("ddl3") and scores["test"] > 0:
                 scores["test"] += 5.0
@@ -429,45 +416,50 @@ class SaviaOrchestrator:
 
         # Lifecycle companion agents to ensure all 3 recommendation cards are populated
         LIFECYCLE_COMPANIONS: Dict[str, List[tuple]] = {
+            "solution-analyzer": [
+                ("change-impact", "Assess the impact of the proposed solution on current systems", 0.93),
+                ("agile-stories", "Break the agreed solution into user stories", 0.91),
+                ("kdd-dab", "Take the solution design to the Design Authority Board", 0.88),
+            ],
             "ddl3": [
-                ("user-stories", "Agile User Stories & Backlog Epics Agent", "Stories and BDD criteria upstream of design specification", 0.93),
-                ("test", "Test Automation & Inventory Agent", "Test inventory and FIT/UAT test cases downstream of design", 0.91),
-                ("kdd-package", "KDD Package for DAB Agent", "Architecture governance and design authority review", 0.88),
+                ("agile-stories", "Stories and BDD criteria upstream of design specification", 0.93),
+                ("test", "Test inventory and FIT/UAT test cases downstream of design", 0.91),
+                ("kdd-dab", "Architecture governance and design authority review", 0.88),
             ],
             "test": [
-                ("ddl3", "DDL3 Design Agent", "Technical architecture and functional design baseline", 0.93),
-                ("user-stories", "Agile User Stories & Backlog Epics Agent", "User stories and BDD criteria for test verification", 0.91),
-                ("readiness-scoring", "Delivery Readiness Scoring & SDLC Audit Agent", "Verify test coverage against delivery quality gates", 0.88),
+                ("ddl3", "Technical architecture and functional design baseline", 0.93),
+                ("agile-stories", "User stories and BDD criteria for test verification", 0.91),
+                ("readiness-audit", "Verify test coverage against delivery quality gates", 0.88),
             ],
-            "user-stories": [
-                ("ddl3", "DDL3 Design Agent", "Detailed design and architecture specification downstream", 0.93),
-                ("test", "Test Automation & Inventory Agent", "Test inventory and acceptance criteria verification", 0.91),
-                ("mom", "MOM & Action Items Agent", "Discussion context and stakeholder requirements baseline", 0.88),
+            "agile-stories": [
+                ("ddl3", "Detailed design and architecture specification downstream", 0.93),
+                ("test", "Test inventory and acceptance criteria verification", 0.91),
+                ("mom", "Discussion context and stakeholder requirements baseline", 0.88),
             ],
             "mom": [
-                ("user-stories", "Agile User Stories & Backlog Epics Agent", "Decompose meeting outcomes into INVEST user stories", 0.93),
-                ("gap-analysis", "Requirement Gap Analysis & Traceability Matrix (RTM) Agent", "Identify requirements gaps from discussion notes", 0.91),
-                ("ddl3", "DDL3 Design Agent", "Architecture and design specifications discussed in meeting", 0.88),
+                ("agile-stories", "Decompose meeting outcomes into INVEST user stories", 0.93),
+                ("gap-analysis", "Identify requirements gaps from discussion notes", 0.91),
+                ("ddl3", "Architecture and design specifications discussed in meeting", 0.88),
             ],
-            "readiness-scoring": [
-                ("test", "Test Automation & Inventory Agent", "Audit test suite execution results and code coverage", 0.93),
-                ("ddl3", "DDL3 Design Agent", "Evaluate technical design deliverables against SDLC quality gates", 0.91),
-                ("gap-analysis", "Requirement Gap Analysis & RTM Agent", "Traceability audit across requirements and artifacts", 0.88),
+            "readiness-audit": [
+                ("test", "Audit test suite execution results and code coverage", 0.93),
+                ("ddl3", "Evaluate technical design deliverables against SDLC quality gates", 0.91),
+                ("gap-analysis", "Traceability audit across requirements and artifacts", 0.88),
             ],
             "gap-analysis": [
-                ("user-stories", "Agile User Stories & Backlog Epics Agent", "Trace gap items back to user story backlog", 0.93),
-                ("ddl3", "DDL3 Design Agent", "Verify technical architecture addresses requirement gaps", 0.91),
-                ("readiness-scoring", "Delivery Readiness Scoring & SDLC Audit Agent", "Audit delivery readiness against unmet requirements", 0.88),
+                ("agile-stories", "Trace gap items back to user story backlog", 0.93),
+                ("ddl3", "Verify technical architecture addresses requirement gaps", 0.91),
+                ("readiness-audit", "Audit delivery readiness against unmet requirements", 0.88),
             ],
             "change-impact": [
-                ("ddl3", "DDL3 Design Agent", "Evaluate target architecture and component modifications", 0.93),
-                ("test", "Test Automation & Inventory Agent", "Plan regression testing for impacted workstreams", 0.91),
-                ("kdd-package", "KDD Package for DAB Agent", "Architecture decision dossier for impacted systems", 0.88),
+                ("ddl3", "Evaluate target architecture and component modifications", 0.93),
+                ("test", "Plan regression testing for impacted workstreams", 0.91),
+                ("kdd-dab", "Architecture decision dossier for impacted systems", 0.88),
             ],
-            "kdd-package": [
-                ("ddl3", "DDL3 Design Agent", "Source functional and technical design specifications", 0.93),
-                ("change-impact", "Change Impact Assessment & Interdependency Matrix Agent", "Evaluate architectural change dependencies for board", 0.91),
-                ("readiness-scoring", "Delivery Readiness Scoring & SDLC Audit Agent", "Audit governance readiness for DAB sign-off", 0.88),
+            "kdd-dab": [
+                ("ddl3", "Source functional and technical design specifications", 0.93),
+                ("change-impact", "Evaluate architectural change dependencies for board", 0.91),
+                ("readiness-audit", "Audit governance readiness for DAB sign-off", 0.88),
             ],
         }
 
@@ -501,24 +493,24 @@ class SaviaOrchestrator:
             top_agent = "mom"
             recommended_agents.append({
                 "agent": "mom",
-                "agent_name": "MOM & Action Items Agent",
+                "agent_name": agent_names["mom"],
                 "reason": "Defaulting to MOM & Requirement Understanding for document ingestion.",
                 "required_inputs": ["normalized_text"],
                 "confidence": 0.95,
                 "matched": True,
             })
 
-        # Ensure we always have at least 3 matched agents so all 3 cards in the UI render properly
+        # Fill up to 5 matched agents so every recommendation card on the Reading screen renders
         matched_ids = {entry["agent"] for entry in recommended_agents}
         companions = LIFECYCLE_COMPANIONS.get(top_agent, LIFECYCLE_COMPANIONS["ddl3"])
 
-        for comp_id, comp_name, comp_reason, comp_conf in companions:
-            if len([a for a in recommended_agents if a.get("matched")]) >= 3:
+        for comp_id, comp_reason, comp_conf in companions:
+            if len([a for a in recommended_agents if a.get("matched")]) >= 5:
                 break
             if comp_id not in matched_ids:
                 recommended_agents.append({
                     "agent": comp_id,
-                    "agent_name": comp_name,
+                    "agent_name": agent_names[comp_id],
                     "reason": comp_reason,
                     "required_inputs": agent_inputs.get(comp_id, ["normalized_text"]),
                     "confidence": comp_conf,

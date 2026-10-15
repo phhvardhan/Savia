@@ -444,21 +444,22 @@ async def truncate_transcript(transcript: str) -> str:
 async def generate_mom(transcript: str, api_key: Optional[str] = None) -> dict:
     transcript = await truncate_transcript(transcript)
     system = (
-        "You are an expert senior business analyst and requirements specialist. "
-        "Your task is to analyze the provided transcript or requirements text and produce a comprehensive, "
-        "thorough, and highly detailed Minutes of Meeting (MoM).\n\n"
-        "MANDATORY REQUIREMENT - YOU MUST EXTRACT AND POPULATE ALL 6 BULLET LIST CATEGORIES BELOW:\n"
-        "1. discussion_summary: A comprehensive, multi-sentence executive summary explaining the background, context, and core discussion.\n"
-        "2. key_points: Detailed bullet points summarizing core discussion topics, background context, and operational facts.\n"
-        "3. requirements_identified: Specific functional, non-functional, and technical requirements mentioned or implied.\n"
-        "4. decisions_finalized: Clear decisions, architectural choices, process agreements, or consensus points established.\n"
-        "5. action_items: Actionable next steps, practical tasks, team assignments (e.g. for Tech, Business, Ops, Integration, Infrastructure teams), and follow-up activities derived from the text.\n"
-        "6. open_questions: Key unresolved technical/business questions, risks, edge cases, or items requiring further validation.\n\n"
-        "STRICT MANDATE:\n"
-        "- Under NO circumstances should action_items, decisions_finalized, key_points, requirements_identified, or open_questions be empty lists.\n\n"
-        "Respond ONLY with valid JSON (no markdown fences) matching this schema:\n"
-        '{"discussion_summary": str, "key_points": [str], "requirements_identified": [str], '
-        '"decisions_finalized": [str], "action_items": [str], "open_questions": [str]}'
+        "You are a senior business analyst writing Minutes of Meeting (MoM) from a transcript or notes.\n\n"
+        "RULES:\n"
+        "- Use only what the text says. Never invent people, owners, dates, decisions or figures.\n"
+        "- If a field is not stated (e.g. an action has no due date), use null. Keep dates as written.\n"
+        "- An empty list is correct when the meeting had none of that item.\n"
+        "- decisions_finalized: only things the meeting explicitly agreed, not proposals.\n"
+        "- open_questions: questions raised and left unanswered.\n"
+        "- Text under [ANSWERS TO OPEN QUESTIONS] is confirmed by the user after the meeting: put each answer "
+        "in key_points and into the decision or action it settles (e.g. an owner), and do not list it as open.\n\n"
+        "Respond ONLY with valid JSON (no markdown fences) in this shape:\n"
+        '{"discussion_summary": str, '
+        '"attendees": [{"name": str, "role": str|null}], '
+        '"key_points": [str], "requirements_identified": [str], '
+        '"decisions_finalized": [{"decision": str, "speaker": str|null, "context": str|null}], '
+        '"action_items": [{"action": str, "assignee": str|null, "due_date": str|null, "speaker": str|null}], '
+        '"open_questions": [str]}'
     )
     return await call_llm(system, transcript, api_key, expected_type=dict)
 

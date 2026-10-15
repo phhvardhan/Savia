@@ -1,6 +1,7 @@
 import json
 from typing import Dict, Any, Optional
 from app.agents.base import BaseAgent
+from app.models.workflow import StageEnum
 from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
@@ -17,20 +18,18 @@ class Ddl3Agent(BaseAgent):
     4. Create Config DDL3
     5. Update Config DDL3
     """
-    @property
-    def agent_name(self) -> str:
-        return "ddl3"
-
-    @property
-    def stage(self) -> str:
-        return "ddl3"
+    id = "ddl3"
+    name = "DDL3 (Design Document Lifecycle)"
+    purpose = "Writes or updates a DDL3 detailed functional/technical design document from approved stories or architecture input."
+    stage = StageEnum.DDL3
+    required_inputs = ["approved_user_stories_or_architecture"]
 
     async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
         document_type = input_data.get("document_type", "functional_design").lower()
         use_case = input_data.get("use_case") or "create_functional_design"
         
         text_input = input_data.get("normalized_input") or input_data.get("text") or ""
-        stories_input = input_data.get("user_stories") or input_data.get("outputs", {}).get("user_stories") or {}
+        stories_input = input_data.get("agile_stories") or input_data.get("outputs", {}).get("agile_stories") or {}
         existing_doc = input_data.get("existing_design_doc") or {}
 
         context_str = f"USE CASE: {use_case}\nDOCUMENT TYPE: {document_type}\n\nREQUIREMENTS:\n{fit_text(text_input, 6000)}\n\n"

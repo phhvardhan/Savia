@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -9,17 +10,22 @@ import { StatGrid } from '../components/ui/StatGrid';
 import { DataTable } from '../components/ui/DataTable';
 import { formatBytes, useAttachment } from '../state/attachment';
 import { useRun } from '../state/run';
-import { useConnectorEnds } from '../hooks/useConnectorEnds';
-import { agentLabel, agentMeta, ingestFile, recommendAgents } from '../lib/savia';
+import { FanConnector } from '../components/ui/FanConnector';
+import { AGENT_META, agentLabel, agentMeta, ingestFile, recommendAgents } from '../lib/savia';
 import { readDocStats } from '../lib/docStats';
 import { ApiError } from '../lib/api';
-import { claim, release } from '../lib/once';
+import { claim, isClaimed, release, resetOnce } from '../lib/once';
+import { ReadingLoader } from './ReadingLoader';
+import type { UploadResult } from '../lib/savia';
 import styles from './ReadingPage.module.css';
 
 type StepState = 'Done' | 'Now' | 'Next';
 type Phase = 'idle' | 'reading' | 'recommending' | 'done' | 'error';
 
 const STEP_TITLES = ['Read the input', 'Work out the stage', 'Choose the agents'];
+
+/** Figma screen 04: each agent has its own colour; only the chosen card lights up in it. */
+const tone = (agent: string) => ({ '--tone': AGENT_META[agent]?.color ?? '#005EEB' }) as CSSProperties;
 
 /** Step states straight from the two real calls: ingest, then one AI call that
  *  works out the stage and the agents together. */
@@ -44,8 +50,8 @@ function withBreaks(name: string) {
 
 export function ReadingPage() {
   const navigate = useNavigate();
-  const { attachment } = useAttachment();
-  const { upload, recommendation, setRun, selectedAgent, selectAgent, startAgentRun } = useRun();
+  const { attachment, setAttachment } = useAttachment();
+  const { upload, recommendation, setRun, selectedAgent, selectAgent, startAgentRun, resetAll } = useRun();
 
   const [reveal] = useState(() => !hasRevealed);
 
@@ -55,6 +61,13 @@ export function ReadingPage() {
     recommendation ? 'done' : attachment ? 'reading' : 'idle',
   );
   const [error, setError] = useState<string | null>(null);
+  // For the loading screen: what has been read so far, and when each call started.
+  const [ingestedNow, setIngestedNow] = useState<UploadResult | null>(null);
+  const [startedAt] = useState(() => Date.now());
+  const [recommendingSince, setRecommendingSince] = useState<number | null>(null);
+  // The loading screen stays until its steps have played out (instantly when re-visiting).
+  const [loaderDone, setLoaderDone] = useState(() => Boolean(recommendation));
+  const finishLoader = useCallback(() => setLoaderDone(true), []);
 
   // The real run: ingest the file, then ask SAVIA which agent fits.
   useEffect(() => {
@@ -70,6 +83,9 @@ export function ReadingPage() {
     (async () => {
       try {
         const ingested = await ingestFile(attachment.files);
+        if (!isClaimed(key)) return; // cancelled while reading
+        setIngestedNow(ingested);
+        setRecommendingSince(Date.now());
         setPhase('recommending');
         const result = await recommendAgents({
           workflow_id: ingested.workflow_id,
@@ -77,9 +93,11 @@ export function ReadingPage() {
           input_type: ingested.input_type,
           filename: ingested.filename,
         });
+        if (!isClaimed(key)) return; // cancelled: don't bring the old run back
         setRun(ingested, result);
         setPhase('done');
       } catch (caught) {
+        if (!isClaimed(key)) return;
         release(key);
         setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
         setPhase('error');
@@ -102,20 +120,18 @@ export function ReadingPage() {
   // Only agents the document actually triggered belong on this screen.
   const recommends = (recommendation?.recommended_agents ?? [])
     .filter((agent) => agent.matched)
-    .slice(0, 3);
+    .slice(0, 5);
   const byAI = recommendation?.source === 'llm';
   const missing = recommendation?.missing_information ?? [];
   const chosen = recommends.find((agent) => agent.agent === selectedAgent) ?? recommends[0] ?? null;
-  const countWord = ['no', 'one', 'two', 'three'][recommends.length] ?? String(recommends.length);
+  const countWord = ['no', 'one', 'two', 'three', 'four', 'five'][recommends.length] ?? String(recommends.length);
 
   // Right-hand connector ends, measured from where each card actually sits
   // (cards vary in height and count), as % of the connector's height.
   const recommendsRef = useRef<HTMLUListElement>(null);
-  const connectorRef = useRef<SVGSVGElement>(null);
-  const cardYs = useConnectorEnds(recommendsRef, connectorRef, ':scope > li > button', [
-    recommends.length,
-    selectedAgent,
-  ]);
+  const gaveRef = useRef<HTMLDivElement>(null);
+  const hubRef = useRef<HTMLElement>(null);
+  const lineDeps = [recommends.length, chosen?.agent, missing.length, phase];
 
   // Counted from the document's own text, not from fixed copy.
   const stats = upload ? readDocStats(upload.full_normalized_text) : null;
@@ -157,6 +173,28 @@ export function ReadingPage() {
     return () => clearTimeout(timer);
   }, [reveal]);
 
+  // Screen 03: a loading screen, not a page, until the recommendation is in.
+  if (attachment && phase !== 'idle' && !(phase === 'done' && loaderDone)) {
+    return (
+      <ReadingLoader
+        files={attachment.files}
+        ingested={ingestedNow}
+        recommendingSince={recommendingSince}
+        startedAt={startedAt}
+        error={error}
+        finished={phase === 'done'}
+        onFinished={finishLoader}
+        onCancel={() => {
+          resetAll();
+          setAttachment(null);
+          resetOnce();
+          navigate('/work');
+        }}
+        onRetry={() => navigate('/intake')}
+      />
+    );
+  }
+
   return (
     <Section
       id="reading"
@@ -190,7 +228,7 @@ export function ReadingPage() {
           <p className={`${styles.columnLabel} ${styles.labelWorking}`}>Savia is working it out</p>
           <p className={`${styles.columnLabel} ${styles.labelRecommends}`}>What it recommends</p>
 
-          <div className={styles.gave}>
+          <div ref={gaveRef} className={styles.gave}>
             <article className={styles.inputCard}>
               <div className={styles.inputHead}>
                 <h3 className={styles.inputTitle}>
@@ -252,25 +290,16 @@ export function ReadingPage() {
             )}
           </div>
 
-          <svg
+          <FanConnector
             className={`${styles.connector} ${styles.connectorLeft}`}
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            {(missing.length > 0 ? [[25, 46], [75, 54]] : [[50, 50]]).map(([from, to]) => (
-              <path
-                key={from}
-                d={`M0 ${from} C 45 ${from}, 55 ${to}, 100 ${to}`}
-                fill="none"
-                stroke="#C3C4C5"
-                strokeWidth="1.2"
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
-          </svg>
+            cards={gaveRef}
+            cardSelector=":scope > article"
+            hub={hubRef}
+            hubSide="right"
+            deps={lineDeps}
+          />
 
-          <section className={styles.orchestrator} aria-label="Savia agent recommender progress">
+          <section ref={hubRef} className={styles.orchestrator} aria-label="Savia agent recommender progress">
             <div className={styles.orchestratorHead}>
               <h3 className={styles.orchestratorName}>Savia · Agent Recommender</h3>
               <p className={styles.orchestratorState}>
@@ -303,33 +332,22 @@ export function ReadingPage() {
             ))}
           </section>
 
-          <svg
-            ref={connectorRef}
+          <FanConnector
             className={`${styles.connector} ${styles.connectorRight}`}
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            {recommends.map((item, i) => {
-              const end = cardYs[i];
-              if (end === undefined) return null;
-              // Fan out from the middle of the recommender box.
-              const start = 50 + (i - (recommends.length - 1) / 2) * 10;
-              const chosen = item.agent === selectedAgent;
-              return (
-                <path
-                  key={item.agent}
-                  d={`M0 ${start} C 50 ${start}, 50 ${end}, 100 ${end}`}
-                  fill="none"
-                  stroke={chosen ? '#005EEB' : '#C3C4C5'}
-                  strokeWidth={chosen ? 1.6 : 1.2}
-                  // px, not viewBox units: the svg is stretched far more tall than wide
-                  vectorEffect="non-scaling-stroke"
-                  strokeDasharray={!chosen && item.confidence < 0.5 ? '3 3' : undefined}
-                />
-              );
-            })}
-          </svg>
+            cards={recommendsRef}
+            cardSelector=":scope > li > button"
+            hub={hubRef}
+            hubSide="left"
+            deps={lineDeps}
+            line={(i) => {
+              const isChosen = recommends[i]?.agent === chosen?.agent;
+              return {
+                stroke: isChosen ? AGENT_META[recommends[i].agent]?.color ?? '#005EEB' : '#C3C4C5',
+                strokeWidth: isChosen ? 1.6 : 1.2,
+                strokeDasharray: !isChosen && (recommends[i]?.confidence ?? 1) < 0.5 ? '3 3' : undefined,
+              };
+            }}
+          />
 
           <ul ref={recommendsRef} className={styles.recommends}>
             {error && <li className={styles.recommendError}>{error}</li>}
@@ -354,22 +372,23 @@ export function ReadingPage() {
               </li>
             )}
 
-            {recommends.map((item) => {
-              const chosen = item.agent === selectedAgent;
+            {recommends.map((item, index) => {
+              const isChosen = item.agent === chosen?.agent;
               const isBest = item.agent === recommendation?.primary_agent;
               return (
                 <li key={item.agent}>
                   <button
                     type="button"
-                    aria-pressed={chosen}
+                    aria-pressed={isChosen}
+                    style={tone(item.agent)}
                     className={`${styles.recommend} ${styles.recommendButton} ${
-                      chosen ? styles.recommendChosen : ''
+                      isChosen ? styles.recommendChosen : ''
                     }`}
                     onClick={() => selectAgent(item.agent)}
                   >
                     <span className={styles.recommendHead}>
-                      <span className={styles.recommendTitle}>{agentLabel(item)}</span>
-                      {chosen && (
+                      <span className={styles.recommendTitle}>{index + 1} · {agentLabel(item)}</span>
+                      {isChosen && (
                         <span className={styles.chosenPill}>
                           <span className={styles.stateDot} aria-hidden="true" />
                           Chosen
@@ -413,7 +432,7 @@ export function ReadingPage() {
               return {
                 id: agent.agent,
                 cells: [
-                  <span key="rank" className={styles.rank}>{index + 1}</span>,
+                  <span key="rank" className={styles.rank} style={tone(agent.agent)}>{index + 1}</span>,
                   meta.full,
                   agent.reason,
                   meta.output,
@@ -449,7 +468,8 @@ export function ReadingPage() {
               onClick={() => {
                 // Fire the agent and move on: the writing page shows its progress.
                 if (chosen) startAgentRun(chosen.agent);
-                navigate('/writing');
+                // TEST has its own screens (13–19); every other agent goes 05 → 11.
+                navigate(chosen?.agent === 'test' ? '/test-ready' : '/writing');
               }}
             >
               Approve and start

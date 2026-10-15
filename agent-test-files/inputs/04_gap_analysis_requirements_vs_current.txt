@@ -1,0 +1,15 @@
+Northwind Pharma - Requirements vs current capability (Rotterdam pilot)
+
+REQUIREMENTS
+REQ-01  WMS stock movements update SAP within 5 minutes.
+REQ-02  Planners can see when SAP stock was last updated from the WMS.
+REQ-03  Integration support is alerted within 15 minutes when a stock posting fails.
+REQ-04  Every stock change by the integration is recorded in a GxP audit trail.
+REQ-05  Integration support can re-post a failed stock movement themselves.
+
+CURRENT CAPABILITY (as-is, confirmed by Tom Becker, WMS Architect)
+- Stock is sent once a night by SFTP file. No intra-day updates.            (relates to REQ-01)
+- SAP material master already shows "last changed on" for each stock posting. (relates to REQ-02)
+- There is no alerting at all; failures are found next morning by planners. (relates to REQ-03)
+- SAP change documents already log who changed stock, before/after and time. (relates to REQ-04)
+- Failed records can be reprocessed by support from the SAP IDoc monitor (BD87). (relates to REQ-05)

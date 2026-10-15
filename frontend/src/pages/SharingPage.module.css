@@ -98,7 +98,7 @@
   gap: 18px;
   padding: 20px 22px;
   border-radius: var(--radius);
-  background: linear-gradient(90deg, #A81100 0%, #EB1700 100%);
+  background: linear-gradient(90deg, var(--red-dark) 0%, var(--brand-red) 100%);
   color: #FFFFFF;
 }
 

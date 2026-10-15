@@ -60,7 +60,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <header className={styles.masthead}>
         <div className={styles.mastheadInner}>
-          <NavLink to="/work" className={styles.brand}>
+          {/* Going home starts fresh, like Start New Run. */}
+          <NavLink to="/work" className={styles.brand} onClick={handleStartNewRun}>
             <img
               className={styles.brandMark}
               src="/assets/savia-logo-black 1.png"
@@ -76,6 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
+                    onClick={item.to === '/work' ? handleStartNewRun : undefined}
                     className={({ isActive }) =>
                       isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
                     }

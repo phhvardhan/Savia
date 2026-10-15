@@ -1,0 +1,13 @@
+Northwind Pharma - Pilot readiness pack: Event-based stock sync (Rotterdam)
+Prepared for go-live readiness review
+
+1. Scope: Rotterdam (NL01) only. Event-based sync from Manhattan WMS to SAP S/4HANA via SAP Integration Suite.
+2. Design: Detailed design DDL3 v1.0 approved by the Design Lead on 20 November 2026.
+3. Build: Integration flows built and unit tested. 42 of 42 unit tests passed.
+4. Testing: Functional (FIT) testing complete, 18 of 20 test cases passed, 2 defects open (both medium severity).
+   UAT: not started.
+   Performance testing: not planned.
+5. GxP validation: Validation plan written. Validation report not yet signed by QA.
+6. Cutover: 2-week parallel run planned. No rollback plan has been written.
+7. Support: Hypercare team named (integration support, 2 analysts). Runbook in draft.
+8. Training: Planners not yet trained on the new "last updated" field.

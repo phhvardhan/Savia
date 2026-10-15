@@ -1,0 +1,16 @@
+Northwind Pharma - Change request CR-2026-114: Replace nightly stock batch with event-based sync (Rotterdam pilot)
+
+Current state
+- Manhattan WMS writes a stock file at 23:00; SAP S/4HANA loads it at 02:00 via SFTP.
+- The finance reconciliation report runs at 06:00 and compares SAP stock to the WMS file.
+- The planning dashboard (Power BI) refreshes from SAP at 07:00.
+
+Target state
+- WMS publishes a stock event per movement; SAP Integration Suite posts it to SAP within 5 minutes.
+- The nightly SFTP file is switched off for Rotterdam after a 2-week parallel run.
+
+Known dependencies
+- The WMS team must deliver the event publisher before integration testing can start.
+- The finance reconciliation report reads the nightly file today, so it must be re-pointed before the file is switched off.
+
+Teams involved: WMS team, SAP integration team, Finance reporting, Supply planning, QA/GxP.

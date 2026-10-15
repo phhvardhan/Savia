@@ -1,18 +1,17 @@
 import json
 from typing import Dict, Any, Optional
 from app.agents.base import BaseAgent
+from app.models.workflow import StageEnum
 from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
-class UserStoryAgent(BaseAgent):
-    @property
-    def agent_name(self) -> str:
-        return "user-stories"
-
-    @property
-    def stage(self) -> str:
-        return "user_story"
+class AgileStoriesAgent(BaseAgent):
+    id = "agile-stories"
+    name = "Agile User Stories & Backlog Epics"
+    purpose = "Turns requirements, BRDs or meeting outcomes into INVEST user stories with Given/When/Then acceptance criteria."
+    stage = StageEnum.USER_STORY
+    required_inputs = ["approved_requirements_or_mom"]
 
     async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
         requirements_text = input_data.get("normalized_input") or input_data.get("text") or ""
@@ -25,7 +24,7 @@ class UserStoryAgent(BaseAgent):
         if not context_str.strip():
             raise ValueError("No input text or MOM context provided for Agile User Story Agent.")
 
-        logger.info(f"[UserStoryAgent] Generating INVEST user stories from context length {len(context_str)}...")
+        logger.info(f"[AgileStoriesAgent] Generating INVEST user stories from context length {len(context_str)}...")
 
         system = (
             "You are an expert Agile Product Manager and Scrum Master. Convert approved requirements into Agile backlog artifacts.\n"
@@ -85,4 +84,4 @@ class UserStoryAgent(BaseAgent):
         return stories_data
 
 
-user_story_agent = UserStoryAgent()
+agile_stories_agent = AgileStoriesAgent()

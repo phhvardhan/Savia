@@ -1,23 +1,22 @@
 import json
 from typing import Dict, Any, Optional
-from app.agents.base import BaseAgent
+from app.agents.base import BaseAgent, GROUNDING_RULES
+from app.models.workflow import StageEnum
 from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
-class KddPackageAgent(BaseAgent):
+class KddDabAgent(BaseAgent):
     """
     KDD Package (Knowledge Design Document) for DAB Agent.
     Generates architecture dossiers tailored for Design Authority Board (DAB) review,
     architectural governance, decision frameworks, and audit compliance.
     """
-    @property
-    def agent_name(self) -> str:
-        return "kdd-package"
-
-    @property
-    def stage(self) -> str:
-        return "kdd_package"
+    id = "kdd-dab"
+    name = "KDD Package for DAB"
+    purpose = "Assembles a Knowledge Design Document package for Design Authority Board (DAB) review from an architecture/design doc."
+    stage = StageEnum.DDL3
+    required_inputs = ["architecture_design_doc"]
 
     async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
         text_input = input_data.get("normalized_input") or input_data.get("text") or ""
@@ -30,7 +29,7 @@ class KddPackageAgent(BaseAgent):
         if not context_str.strip():
             raise ValueError("Input text cannot be empty for KDD Package for DAB Agent.")
 
-        logger.info(f"[KddPackageAgent] Generating DAB Dossier and KDD package from context length {len(context_str)}...")
+        logger.info(f"[KddDabAgent] Generating DAB Dossier and KDD package from context length {len(context_str)}...")
 
         system = (
             "You are an Enterprise Lead Architect & Governance Director for the Design Authority Board (DAB). "
@@ -45,7 +44,7 @@ class KddPackageAgent(BaseAgent):
             '  "dab_submission_id": "DAB-KDD-001",\n'
             '  "executive_dossier": "High-level architectural overview for DAB board members",\n'
             '  "architectural_governance": {\n'
-            '    "governance_status": "Ready for Board Sign-off",\n'
+            '    "governance_status": "<e.g. Ready for Board Sign-off | Pending Decisions, judged from the input>",\n'
             '    "architectural_principles_evaluated": [\n'
             '      {"principle": "Cloud First & Microservices", "compliance": "Compliant"},\n'
             '      {"principle": "Zero-Trust Security & Encryption", "compliance": "Compliant"}\n'
@@ -62,13 +61,13 @@ class KddPackageAgent(BaseAgent):
             '  ],\n'
             '  "enterprise_compliance_and_audit": {\n'
             '    "gxp_audit_readiness": "Verified",\n'
-            '    "data_sovereignty": "EU/US Compliant",\n'
-            '    "disaster_recovery_rto_rpo": "RTO < 1hr, RPO < 15min"\n'
+            '    "data_sovereignty": "<as stated in the input, else null>",\n'
+            '    "disaster_recovery_rto_rpo": "<as stated in the input, else null>"\n'
             '  }\n'
             "}"
         )
 
-        kdd_data = await call_llm(system, context_str, api_key=api_key, expected_type=dict)
+        kdd_data = await call_llm(system + GROUNDING_RULES, context_str, api_key=api_key, expected_type=dict)
 
         if "decision_making_framework" not in kdd_data:
             kdd_data["decision_making_framework"] = []
@@ -76,4 +75,4 @@ class KddPackageAgent(BaseAgent):
         return kdd_data
 
 
-kdd_package_agent = KddPackageAgent()
+kdd_dab_agent = KddDabAgent()

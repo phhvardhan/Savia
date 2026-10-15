@@ -7,8 +7,8 @@ from app.main import app
 from app.orchestration.workflow_engine import workflow_engine
 from app.orchestration.stage_manager import stage_manager
 from app.agents import (
-    mom_agent, user_story_agent, ddl3_agent, test_agent,
-    readiness_scoring_agent, gap_analysis_agent, change_impact_agent, kdd_package_agent
+    mom_agent, agile_stories_agent, ddl3_agent, test_agent,
+    readiness_audit_agent, gap_analysis_agent, change_impact_agent, kdd_dab_agent
 )
 from app.models.workflow import StageEnum
 
@@ -161,8 +161,8 @@ def test_06_mom_generation():
 
 # 7. Test User Story Generation
 def test_07_user_story_generation():
-    with patch("app.agents.user_story_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_USER_STORY_RESPONSE):
-        result = asyncio.run(user_story_agent.run({"text": "As an admin, I want to manage user roles so that access is secured."}))
+    with patch("app.agents.agile_stories_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_USER_STORY_RESPONSE):
+        result = asyncio.run(agile_stories_agent.run({"text": "As an admin, I want to manage user roles so that access is secured."}))
         assert "epics" in result
         assert len(result["user_stories"]) >= 1
 
@@ -182,10 +182,10 @@ def test_09_test_case_generation():
 
 
 # 10. Test Readiness Scoring Agent
-def test_10_readiness_scoring_agent():
-    with patch("app.agents.readiness_scoring_agent.score_document_ai", new_callable=AsyncMock, return_value=MOCK_SCORE_RESPONSE):
-        result = asyncio.run(readiness_scoring_agent.run({"text": "Enterprise Specification Document for Audit"}))
-        assert result["agent"] == "readiness-scoring"
+def test_10_readiness_audit_agent():
+    with patch("app.agents.readiness_audit_agent.score_document_ai", new_callable=AsyncMock, return_value=MOCK_SCORE_RESPONSE):
+        result = asyncio.run(readiness_audit_agent.run({"text": "Enterprise Specification Document for Audit"}))
+        assert result["agent"] == "readiness-audit"
         assert result["overall_score"] == 88
 
 
@@ -216,25 +216,26 @@ def test_12_change_impact_agent():
 
 
 # 13. Test KDD Package Agent
-def test_13_kdd_package_agent():
+def test_13_kdd_dab_agent():
     mock_kdd = {
         "title": "KDD Package for DAB",
         "dab_submission_id": "DAB-KDD-001",
         "architectural_governance": {"governance_status": "Ready"},
         "decision_making_framework": []
     }
-    with patch("app.agents.kdd_package_agent.call_llm", new_callable=AsyncMock, return_value=mock_kdd):
-        result = asyncio.run(kdd_package_agent.run({"text": "Architecture dossier for Design Authority Board review."}))
+    with patch("app.agents.kdd_dab_agent.call_llm", new_callable=AsyncMock, return_value=mock_kdd):
+        result = asyncio.run(kdd_dab_agent.run({"text": "Architecture dossier for Design Authority Board review."}))
         assert result["dab_submission_id"] == "DAB-KDD-001"
 
 
 # 14. Test SAVIA Agent Recommendations for All Agents
-def test_14_savia_recommendations():
+@patch("app.orchestration.orchestrator.call_llm", new_callable=AsyncMock, side_effect=RuntimeError("offline"))
+def test_14_savia_recommendations(_llm):
     res_mom = client.post("/api/v1/savia/recommend", json={"raw_text": "Meeting transcript discussion", "input_type": "audio"})
     assert res_mom.json()["primary_agent"] == "mom"
 
     res_audit = client.post("/api/v1/savia/recommend", json={"raw_text": "SDLC audit report for GxP compliance and delivery readiness scoring", "input_type": "txt"})
-    assert res_audit.json()["primary_agent"] == "readiness-scoring"
+    assert res_audit.json()["primary_agent"] == "readiness-audit"
 
     res_gap = client.post("/api/v1/savia/recommend", json={"raw_text": "Requirement gap analysis and traceability matrix (RTM)", "input_type": "txt"})
     assert res_gap.json()["primary_agent"] == "gap-analysis"
@@ -243,7 +244,7 @@ def test_14_savia_recommendations():
     assert res_change.json()["primary_agent"] == "change-impact"
 
     res_kdd = client.post("/api/v1/savia/recommend", json={"raw_text": "Architecture dossier for KDD package and Design Authority Board (DAB) review", "input_type": "txt"})
-    assert res_kdd.json()["primary_agent"] == "kdd-package"
+    assert res_kdd.json()["primary_agent"] == "kdd-dab"
 
 
 # 15. Test Approval Gates
@@ -289,10 +290,10 @@ def test_20_artifact_traceability():
     session = workflow_engine.create_workflow(title="Traceability Session")
     artifact = workflow_engine.save_artifact(
         workflow_id=session.workflow_id,
-        agent_name="user-stories",
+        agent_name="agile-stories",
         stage=StageEnum.USER_STORY,
         content={"user_stories": []}
     )
     retrieved = workflow_engine.get_artifact(artifact.artifact_id)
     assert retrieved.workflow_id == session.workflow_id
-    assert retrieved.agent_name == "user-stories"
+    assert retrieved.agent_name == "agile-stories"

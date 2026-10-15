@@ -59,9 +59,14 @@ interface AgentMeta {
   approver: string;
   agentMinutes: number;
   manualHours: number;
+  /** The sections it writes, in order; screen 05 ticks through them while it runs. */
+  sections: string[];
+  /** Its accent: the screen 04 card and every screen of its run (05–11) take this colour. */
+  color: string;
 }
 
-const AGENT_META: Record<string, AgentMeta> = {
+/** The one place agent names live; the catalog (data/agents.ts) and the backend use the same. */
+export const AGENT_META: Record<string, AgentMeta> = {
   mom: {
     label: 'MOM',
     full: 'Minutes of Meeting (MoM) & Action Items Matrix',
@@ -71,8 +76,10 @@ const AGENT_META: Record<string, AgentMeta> = {
     approver: 'You',
     agentMinutes: 6,
     manualHours: 4,
+    sections: ['Attendees and roles', 'Discussion summary', 'Decisions', 'Action items', 'Open questions'],
+    color: '#EB1700',
   },
-  'user-stories': {
+  'agile-stories': {
     label: 'Agile Stories',
     full: 'Agile User Stories & Backlog Epics',
     blurb: 'Stories and BDD criteria',
@@ -81,6 +88,20 @@ const AGENT_META: Record<string, AgentMeta> = {
     approver: 'Product Owner',
     agentMinutes: 8,
     manualHours: 6,
+    sections: ['Epics', 'User stories', 'Acceptance criteria', 'Priorities and estimates', 'Open questions'],
+    color: '#7B3FE4',
+  },
+  'solution-analyzer': {
+    label: 'Solution Analyzer',
+    full: 'Solution Analyzer & Blueprint',
+    blurb: 'Solution blueprint',
+    working: 'designing the solution',
+    output: 'Approach, components, risks, roadmap',
+    approver: 'Solution Architect',
+    agentMinutes: 9,
+    manualHours: 8,
+    sections: ['Problem and constraints', 'Proposed approach', 'Components', 'Risks', 'Roadmap', 'Open questions'],
+    color: '#00897B',
   },
   'gap-analysis': {
     label: 'Gap Analysis & RTM',
@@ -91,6 +112,8 @@ const AGENT_META: Record<string, AgentMeta> = {
     approver: 'You',
     agentMinutes: 9,
     manualHours: 7,
+    sections: ['Requirements read', 'Current state', 'Gaps found', 'Traceability matrix', 'Open questions'],
+    color: '#005EEB',
   },
   ddl3: {
     label: 'DDL3',
@@ -101,8 +124,10 @@ const AGENT_META: Record<string, AgentMeta> = {
     approver: 'Design Lead',
     agentMinutes: 12,
     manualHours: 10,
+    sections: ['Purpose and scope', 'Definitions', 'Design considerations', 'Field and table design', 'Validation and derivation', 'Impact and dependencies', 'Open questions'],
+    color: '#EF6C00',
   },
-  'kdd-package': {
+  'kdd-dab': {
     label: 'KDD for DAB',
     full: 'KDD Package for DAB',
     blurb: 'DAB governance dossier',
@@ -111,6 +136,8 @@ const AGENT_META: Record<string, AgentMeta> = {
     approver: 'Solution Architect',
     agentMinutes: 10,
     manualHours: 8,
+    sections: ['Key design decisions', 'Alternatives considered', 'Architecture principles', 'Compliance and DR', 'Validation before go-live'],
+    color: '#E3175F',
   },
   'change-impact': {
     label: 'Change Impact',
@@ -121,6 +148,8 @@ const AGENT_META: Record<string, AgentMeta> = {
     approver: 'Solution Architect',
     agentMinutes: 9,
     manualHours: 6,
+    sections: ['The change', 'Impacted systems', 'Dependencies', 'Readiness', 'Open questions'],
+    color: '#B07A00',
   },
   test: {
     label: 'TEST',
@@ -131,8 +160,10 @@ const AGENT_META: Record<string, AgentMeta> = {
     approver: 'Test Lead',
     agentMinutes: 11,
     manualHours: 9,
+    sections: ['Test inventory', 'Test cases', 'Test data', 'Coverage', 'Open questions'],
+    color: '#2F9E24',
   },
-  'readiness-scoring': {
+  'readiness-audit': {
     label: 'Readiness & Audit',
     full: 'Delivery Readiness Scoring & SDLC Audit',
     blurb: 'Readiness scorecard',
@@ -141,6 +172,8 @@ const AGENT_META: Record<string, AgentMeta> = {
     approver: 'Delivery Lead',
     agentMinutes: 7,
     manualHours: 5,
+    sections: ['Deliverables checked', 'Deficits', 'Readiness score', 'Remediation list'],
+    color: '#455A64',
   },
 };
 
@@ -156,6 +189,8 @@ export function agentMeta(agent: RecommendedAgent): AgentMeta {
       approver: 'You',
       agentMinutes: 8,
       manualHours: 5,
+      sections: [],
+      color: '#EB1700',
     }
   );
 }
@@ -213,6 +248,14 @@ export function recommendAgents(body: {
   filename?: string;
 }): Promise<Recommendation> {
   return request<Recommendation>('/savia/recommend', { method: 'POST', body });
+}
+
+/** Screen 10: records the approval of the run's current stage on the workflow. */
+export function approveWorkflow(workflowId: string, approvedBy: string) {
+  return request<{ status: string; stage: string }>(`/workflows/${encodeURIComponent(workflowId)}/approve`, {
+    method: 'POST',
+    body: { user_id: approvedBy, comments: `Approved by ${approvedBy}` },
+  });
 }
 
 /** Response of POST /agents/{agent}. */
@@ -397,7 +440,7 @@ export function sectionText(value: unknown): string {
   if (typeof value === 'object') {
     return Object.entries(value as Record<string, unknown>)
       .filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0))
-      .map(([k, v]) => `${k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}: ${sectionText(v)}`)
+      .map(([k, v]) => `${k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}:${Array.isArray(v) ? '\n' : ' '}${sectionText(v)}`)
       .join('\n');
   }
   return String(value);

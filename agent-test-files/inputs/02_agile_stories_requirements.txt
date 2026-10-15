@@ -1,0 +1,21 @@
+Northwind Pharma - Business Requirements: Real-Time Stock Sync (Rotterdam pilot)
+Version 0.3 - approved by Priya Shah, Supply Chain Lead
+
+Background
+Planners see wrong stock availability for up to a day because SAP S/4HANA and the Manhattan WMS only reconcile in a nightly batch.
+
+Requirements
+REQ-01  Stock movements in the WMS (pick, putaway, adjustment) must update SAP stock within 5 minutes.
+REQ-02  Planners must be able to see, per material, the time SAP stock was last updated from the WMS.
+REQ-03  If a stock movement fails to post in SAP, the integration support team must be alerted within 15 minutes.
+REQ-04  Every stock change made by the integration must be recorded in an audit trail (who/what, before, after, timestamp) to meet GxP.
+REQ-05  Integration support must be able to re-post a failed stock movement without asking IT to change data directly.
+
+Users
+- Supply planner (Rotterdam)
+- Integration support analyst
+- QA / GxP auditor
+
+Out of scope for the pilot
+- Sites other than Rotterdam
+- Changes to the SAP core

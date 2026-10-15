@@ -87,7 +87,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 20px;
-  background: linear-gradient(90deg, #EB1700 0%, #EB7D00 100%);
+  background: linear-gradient(90deg, var(--brand-red) 0%, color-mix(in srgb, var(--brand-red) 55%, #FFB000) 100%);
   color: #FFFFFF;
 }
 
@@ -273,7 +273,7 @@
   position: absolute;
   inset: 0 auto 0 0;
   width: 35%;
-  background: linear-gradient(90deg, #EB1700, #EB7D00);
+  background: linear-gradient(90deg, var(--brand-red), color-mix(in srgb, var(--brand-red) 55%, #FFB000));
   animation: slide 1.4s ease-in-out infinite;
 }
 

@@ -1,0 +1,195 @@
+/* Accent per input-source card */
+.accentInk    { --accent: var(--text-primary); }
+.accentBlue   { --accent: #005EEB; }
+.accentAmber  { --accent: #EB7D00; }
+.accentPurple { --accent: #931CE2; }
+
+.panel { overflow: hidden; }
+
+.block { padding: 30px; }
+
+.label {
+  margin-bottom: 18px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #404040;
+}
+
+/* What you can give it ---------------------------------------------------- */
+.sources {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.source {
+  padding: 20px 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.sourceHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sourceTitle {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 140%;
+  white-space: nowrap;
+  color: var(--accent);
+}
+
+.sourceText {
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 148%;
+  color: var(--text-muted);
+}
+
+.chosen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-red);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.chosenDot { width: 6px; height: 6px; border-radius: 50%; background: #FFFFFF; }
+
+/* What you attached ------------------------------------------------------- */
+.divider { border-top: 1px solid var(--line-soft); }
+
+.attachment {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.thumb {
+  width: 56px;
+  height: 53px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.attachmentText { flex: 1; min-width: 0; }
+
+.fileName {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 140%;
+  color: var(--text-primary);
+}
+
+.fileMeta {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 148%;
+  color: var(--text-tertiary);
+}
+
+.ready {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: #EDFEE8;
+  color: #40AF0C;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* Footer ------------------------------------------------------------------ */
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 1000px) {
+  .sources { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .block { padding: 22px 18px; }
+  .sources { grid-template-columns: minmax(0, 1fr); }
+  .attachment { flex-wrap: wrap; }
+  .actions { flex-direction: column; padding: 22px 18px 26px; }
+}
+
+/* Real attachment carried over from the home finder ----------------------- */
+.thumbIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 53px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-alt);
+  color: var(--icon);
+}
+
+.thumbIcon svg { width: 22px; height: 22px; }
+
+.fileName { word-break: break-all; }
+
+.fileMeta::first-letter { text-transform: uppercase; }
+
+.empty {
+  font-size: 14px;
+  line-height: 152%;
+  color: var(--text-muted);
+}
+
+.empty a {
+  font-weight: 600;
+  color: var(--red-dark);
+  text-decoration: underline;
+}
+
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Several files: one row each, divided like the rest of the panel --------- */
+.files { display: grid; }
+.files > li + li { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
+
+.remove {
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.remove:hover { border-color: var(--brand-red); color: var(--brand-red); }
+
+.count { margin-top: 14px; font-size: 13px; color: var(--text-muted); }
+.limit { color: var(--red-dark); font-weight: 600; }

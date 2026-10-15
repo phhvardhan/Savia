@@ -16,6 +16,7 @@ import {
 } from '../state/attachment';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import {
+  AGENT_META,
   fetchDashboardSummary,
   fetchJiraIssue,
   type DashboardCounter,
@@ -68,7 +69,7 @@ const INITIAL_RUNS: DashboardRun[] = [
 const INITIAL_RAN_THIS_WEEK: WeeklyRun[] = [
   {
     id: 'mom',
-    title: 'Minutes and actions',
+    title: `${AGENT_META['mom'].label} Agent`,
     text: 'Turned a 90-minute design workshop into 6 decisions and 8 owned actions',
     stage: 'Requirements',
     stageHref: '/work',
@@ -78,7 +79,7 @@ const INITIAL_RAN_THIS_WEEK: WeeklyRun[] = [
   },
   {
     id: 'ddl3',
-    title: 'DDL3 Agent',
+    title: `${AGENT_META['ddl3'].label} Agent`,
     text: 'Wrote the functional design for the coding block extension approved first time',
     stage: 'Design',
     usage: 'Used twice this week',
@@ -87,7 +88,7 @@ const INITIAL_RAN_THIS_WEEK: WeeklyRun[] = [
   },
   {
     id: 'test',
-    title: 'TEST Agent',
+    title: `${AGENT_META['test'].label} Agent`,
     text: '62 SIT cases from an approved design, with the two gaps named rather than hidden',
     stage: 'Testing',
     usage: 'Used once this week',
@@ -273,7 +274,7 @@ export function HomePage() {
       const text = new File([prompt.trim()], 'Your description.txt', { type: 'text/plain' });
       setAttachment(attachment ? attachmentFromFiles([...attachment.files, text]) : attachmentFromFiles([text]));
     }
-    navigate('/reading');
+    navigate('/intake');
   };
 
   const isFormValid =

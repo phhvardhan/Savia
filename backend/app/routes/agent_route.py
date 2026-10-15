@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
-from app.agents import AGENT_MAP
+from app.agents import AGENTS, AGENT_MAP
 from app.orchestration.workflow_engine import workflow_engine
 from app.orchestration.stage_manager import stage_manager
 from app.models.workflow import StageEnum, TraceabilityLink
@@ -42,7 +42,7 @@ async def _run_agent_pipeline(agent_name: str, stage_enum: StageEnum, payload: A
         "normalized_input": input_text,
         "document_type": payload.document_type or "functional_design",
         "mom": session.outputs.get("mom"),
-        "user_stories": session.outputs.get("user_stories"),
+        "agile_stories": session.outputs.get("agile_stories"),
         "ddl3": session.outputs.get("ddl3"),
         "outputs": session.outputs,
     }
@@ -50,6 +50,8 @@ async def _run_agent_pipeline(agent_name: str, stage_enum: StageEnum, payload: A
     # Execute agent
     try:
         content = await agent.run(input_data, api_key=payload.api_key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent '{agent_name}' execution failed: {str(e)}")
 
@@ -84,41 +86,18 @@ async def _run_agent_pipeline(agent_name: str, stage_enum: StageEnum, payload: A
     )
 
 
-@router.post("/mom", response_model=AgentRunResponse, tags=["SDLC Agents"])
-async def run_mom_agent(payload: AgentRunRequest):
-    return await _run_agent_pipeline("mom", StageEnum.MOM, payload)
+@router.get("", tags=["SDLC Agents"])
+async def list_agents():
+    """Every registered agent with what it does, for the UI and manual testing."""
+    return [
+        {"id": a.id, "name": a.name, "purpose": a.purpose, "stage": a.stage.value, "required_inputs": a.required_inputs}
+        for a in AGENTS
+    ]
 
 
-@router.post("/user-stories", response_model=AgentRunResponse, tags=["SDLC Agents"])
-async def run_user_stories_agent(payload: AgentRunRequest):
-    return await _run_agent_pipeline("user-stories", StageEnum.USER_STORY, payload)
-
-
-@router.post("/ddl3", response_model=AgentRunResponse, tags=["SDLC Agents"])
-async def run_ddl3_agent(payload: AgentRunRequest):
-    return await _run_agent_pipeline("ddl3", StageEnum.DDL3, payload)
-
-
-@router.post("/test", response_model=AgentRunResponse, tags=["SDLC Agents"])
-async def run_test_agent(payload: AgentRunRequest):
-    return await _run_agent_pipeline("test", StageEnum.TESTING, payload)
-
-
-@router.post("/readiness-scoring", response_model=AgentRunResponse, tags=["SDLC Agents"])
-async def run_readiness_scoring_agent(payload: AgentRunRequest):
-    return await _run_agent_pipeline("readiness-scoring", StageEnum.COMPLETED, payload)
-
-
-@router.post("/gap-analysis", response_model=AgentRunResponse, tags=["SDLC Agents"])
-async def run_gap_analysis_agent(payload: AgentRunRequest):
-    return await _run_agent_pipeline("gap-analysis", StageEnum.REQUIREMENTS, payload)
-
-
-@router.post("/change-impact", response_model=AgentRunResponse, tags=["SDLC Agents"])
-async def run_change_impact_agent(payload: AgentRunRequest):
-    return await _run_agent_pipeline("change-impact", StageEnum.DDL3, payload)
-
-
-@router.post("/kdd-package", response_model=AgentRunResponse, tags=["SDLC Agents"])
-async def run_kdd_package_agent(payload: AgentRunRequest):
-    return await _run_agent_pipeline("kdd-package", StageEnum.DDL3, payload)
+@router.post("/{agent_id}", response_model=AgentRunResponse, tags=["SDLC Agents"])
+async def run_agent(agent_id: str, payload: AgentRunRequest):
+    agent = AGENT_MAP.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found. Known agents: {', '.join(AGENT_MAP)}.")
+    return await _run_agent_pipeline(agent_id, agent.stage, payload)

@@ -1,22 +1,22 @@
 import json
+import re
 from typing import Dict, Any, Optional
 from app.agents.base import BaseAgent
+from app.models.workflow import StageEnum
 from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
 class TestAgent(BaseAgent):
-    @property
-    def agent_name(self) -> str:
-        return "test"
-
-    @property
-    def stage(self) -> str:
-        return "testing"
+    id = "test"
+    name = "TEST — End-to-end Test Preparation"
+    purpose = "Produces a test inventory and FIT/UAT test cases from approved designs or user stories."
+    stage = StageEnum.TESTING
+    required_inputs = ["approved_design_or_user_stories"]
 
     async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
         text_input = input_data.get("normalized_input") or input_data.get("text") or ""
-        stories_input = input_data.get("user_stories") or input_data.get("outputs", {}).get("user_stories") or {}
+        stories_input = input_data.get("agile_stories") or input_data.get("outputs", {}).get("agile_stories") or {}
         ddl3_input = input_data.get("ddl3") or input_data.get("outputs", {}).get("ddl3") or {}
 
         context_str = f"REQUIREMENTS TEXT:\n{fit_text(text_input, 5000)}\n\n"
@@ -25,7 +25,7 @@ class TestAgent(BaseAgent):
         if ddl3_input:
             context_str += f"DDL3 DESIGN SPECIFICATION:\n{json.dumps(ddl3_input)[:4000]}\n\n"
 
-        if not context_str.strip():
+        if not (text_input.strip() or stories_input or ddl3_input):
             raise ValueError("No requirements, user stories, or design artifacts provided for Test Agent.")
 
         logger.info(f"[TestAgent] Generating comprehensive FIT/UAT test inventory and test cases from context length {len(context_str)}...")
@@ -51,7 +51,6 @@ class TestAgent(BaseAgent):
             '    "total_tests": int,\n'
             '    "fit_count": int,\n'
             '    "uat_count": int,\n'
-            '    "coverage_percentage": int (e.g. 95),\n'
             '    "focus_areas": ["Authentication & Authorization", "Data Retrieval", "Error Resilience"]\n'
             '  },\n'
             '  "test_inventory": [\n'
@@ -129,26 +128,22 @@ class TestAgent(BaseAgent):
                 tc["type"] = "FIT"
                 fit_count += 1
 
-        # Fallback or compute test_summary
-        total_tc = len(test_data["test_cases"])
-        if "test_summary" not in test_data or not isinstance(test_data["test_summary"], dict):
-            test_data["test_summary"] = {
-                "total_tests": total_tc,
-                "fit_count": fit_count,
-                "uat_count": uat_count,
-                "coverage_percentage": 92 if total_tc > 0 else 0,
-                "focus_areas": ["Integration Testing", "Functional Validation", "User Journey Assurance"]
-            }
-        else:
-            summary = test_data["test_summary"]
-            if "total_tests" not in summary:
-                summary["total_tests"] = total_tc
-            if "fit_count" not in summary:
-                summary["fit_count"] = fit_count
-            if "uat_count" not in summary:
-                summary["uat_count"] = uat_count
-            if "coverage_percentage" not in summary:
-                summary["coverage_percentage"] = 92 if total_tc > 0 else 0
+        # Coverage is computed, never guessed: the share of story/requirement IDs in the
+        # input that at least one test case traces to. None when the input has no IDs.
+        ids_in_input = set(re.findall(r"\b(?:US|REQ)-\d+\b", context_str))
+        traced = {tc.get(key) for tc in test_data["test_cases"] for key in ("user_story_id", "requirement_id")}
+        coverage = round(100 * len(ids_in_input & traced) / len(ids_in_input)) if ids_in_input else None
+
+        summary = test_data.get("test_summary") if isinstance(test_data.get("test_summary"), dict) else {}
+        summary.update({
+            "total_tests": len(test_data["test_cases"]),
+            "fit_count": fit_count,
+            "uat_count": uat_count,
+            "coverage_percentage": coverage,
+            "untested_ids": sorted(ids_in_input - traced),
+        })
+        summary.setdefault("focus_areas", [])
+        test_data["test_summary"] = summary
 
         return test_data
 

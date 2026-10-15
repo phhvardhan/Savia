@@ -1,3 +1,4 @@
+import { AGENT_META } from '../lib/savia';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -25,48 +26,48 @@ const STAGE_STATE_CLASS: Record<StageState, string> = {
 };
 
 const COL_1: StageCard[] = [
-  { id: 'mom', label: 'Requirements', title: 'MoM & Action Items', state: 'available', stateText: 'Available' },
+  { id: 'mom', label: 'Requirements', title: AGENT_META['mom'].label, state: 'available', stateText: 'Available' },
   {
-    id: 'stories',
+    id: 'agile-stories',
     label: 'Requirements',
-    title: 'Agile User Stories & Epics',
+    title: AGENT_META['agile-stories'].label,
     state: 'comingSoon',
     stateText: 'Coming soon',
   },
-  { id: 'rtm', label: 'Requirements', title: 'Requirement Gap & RTM', state: 'available', stateText: 'Available' },
+  { id: 'gap-analysis', label: 'Requirements', title: AGENT_META['gap-analysis'].label, state: 'available', stateText: 'Available' },
 ];
 
 const COL_2: StageCard[] = [
-  { id: 'ddl3', label: 'Design', title: 'DDL3 — design documents', state: 'running', stateText: 'Running' },
+  { id: 'ddl3', label: 'Design', title: AGENT_META['ddl3'].label, state: 'running', stateText: 'Running' },
   {
-    id: 'architecture',
+    id: 'solution-analyzer',
     label: 'Design',
-    title: 'Enterprise Architecture',
+    title: AGENT_META['solution-analyzer'].label,
     state: 'inReview',
     stateText: 'In review',
   },
   {
-    id: 'kdd',
+    id: 'kdd-dab',
     label: 'Design governance',
-    title: 'KDD Package for DAB',
+    title: AGENT_META['kdd-dab'].label,
     state: 'available',
     stateText: 'Available',
   },
   {
-    id: 'change',
+    id: 'change-impact',
     label: 'Change',
-    title: 'Change Impact & Interdependency',
+    title: AGENT_META['change-impact'].label,
     state: 'available',
     stateText: 'Available',
   },
 ];
 
 const COL_3: StageCard[] = [
-  { id: 'test', label: 'Testing', title: 'TEST — inventories and cases', state: 'queued', stateText: 'Queued' },
+  { id: 'test', label: 'Testing', title: AGENT_META['test'].label, state: 'queued', stateText: 'Queued' },
   {
-    id: 'readiness',
+    id: 'readiness-audit',
     label: 'Release',
-    title: 'Delivery Readiness & SDLC Audit',
+    title: AGENT_META['readiness-audit'].label,
     state: 'comingSoon',
     stateText: 'Coming soon',
   },

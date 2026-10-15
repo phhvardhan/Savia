@@ -1,0 +1,15 @@
+Northwind Pharma - Architecture decision summary for DAB: Event-based stock sync
+
+Context
+Stock in SAP S/4HANA and the Manhattan WMS is synchronised by a nightly SFTP file, causing up to one day of wrong availability at the Rotterdam distribution centre.
+
+Decision 1 - Move from nightly batch to event-based synchronisation.
+  Alternatives considered: (a) run the batch every hour - rejected, still up to 60 minutes stale and heavier on SAP;
+  (b) direct database replication - rejected, bypasses SAP standard interfaces and breaks GxP validation.
+Decision 2 - Use SAP Integration Suite as the integration layer (already licensed at Northwind).
+Decision 3 - Post stock to SAP only through the standard goods movement BAPI; no SAP core changes.
+Decision 4 - Pilot at Rotterdam (plant NL01) before any other site.
+
+Principles applied: use standard interfaces, keep the SAP core clean, GxP audit trail for every change.
+Compliance: GxP computer system validation will be needed for the integration layer before go-live.
+Open: disaster recovery targets (RTO/RPO) for the integration layer have not been agreed.

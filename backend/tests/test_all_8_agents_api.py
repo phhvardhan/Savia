@@ -25,10 +25,10 @@ def test_api_01_mom_agent():
 
 
 def test_api_02_user_stories_agent():
-    with patch("app.agents.user_story_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_STORIES):
-        res = client.post("/api/v1/agents/user-stories", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
+    with patch("app.agents.agile_stories_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_STORIES):
+        res = client.post("/api/v1/agents/agile-stories", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
         assert res.status_code == 200
-        assert res.json()["agent_name"] == "user-stories"
+        assert res.json()["agent_name"] == "agile-stories"
 
 
 def test_api_03_ddl3_agent():
@@ -45,11 +45,11 @@ def test_api_04_test_agent():
         assert res.json()["agent_name"] == "test"
 
 
-def test_api_05_readiness_scoring_agent():
-    with patch("app.agents.readiness_scoring_agent.score_document_ai", new_callable=AsyncMock, return_value=MOCK_SCORE):
-        res = client.post("/api/v1/agents/readiness-scoring", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
+def test_api_05_readiness_audit_agent():
+    with patch("app.agents.readiness_audit_agent.score_document_ai", new_callable=AsyncMock, return_value=MOCK_SCORE):
+        res = client.post("/api/v1/agents/readiness-audit", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
         assert res.status_code == 200
-        assert res.json()["agent_name"] == "readiness-scoring"
+        assert res.json()["agent_name"] == "readiness-audit"
 
 
 def test_api_06_gap_analysis_agent():
@@ -66,8 +66,8 @@ def test_api_07_change_impact_agent():
         assert res.json()["agent_name"] == "change-impact"
 
 
-def test_api_08_kdd_package_agent():
-    with patch("app.agents.kdd_package_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_KDD):
-        res = client.post("/api/v1/agents/kdd-package", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
+def test_api_08_kdd_dab_agent():
+    with patch("app.agents.kdd_dab_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_KDD):
+        res = client.post("/api/v1/agents/kdd-dab", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
         assert res.status_code == 200
-        assert res.json()["agent_name"] == "kdd-package"
+        assert res.json()["agent_name"] == "kdd-dab"

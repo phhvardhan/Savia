@@ -9,10 +9,9 @@ class FutureAgentRegistry:
     """
     AVAILABLE_FUTURE_AGENTS = [
         {"id": "change-impact", "name": "Change Impact Assessment & Interdependency Matrix"},
-        {"id": "kdd-package", "name": "KDD Package for DAB"},
+        {"id": "kdd-dab", "name": "KDD Package for DAB"},
         {"id": "gap-analysis", "name": "Requirement Gap Analysis & RTM"},
         {"id": "readiness-audit", "name": "Delivery Readiness Scoring & SDLC Audit"},
-        {"id": "enterprise-arch", "name": "Enterprise Solution Architecture & Blueprints"},
     ]
 
     def list_future_agents(self) -> List[Dict[str, str]]:

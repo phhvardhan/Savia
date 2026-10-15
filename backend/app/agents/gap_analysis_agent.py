@@ -1,27 +1,26 @@
 import json
 from typing import Dict, Any, Optional
-from app.agents.base import BaseAgent
+from app.agents.base import BaseAgent, GROUNDING_RULES
+from app.models.workflow import StageEnum
 from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
 class GapAnalysisAgent(BaseAgent):
     """
-    Requirement Gap Analysis & Traceability Matrix (RTM) Agent.
+    Requirement Gap Analysis & RTM.
     Provides end-to-end traceability, standard vs custom gap identification,
     and highlights unmet requirements with timeline/budget impact analysis.
     """
-    @property
-    def agent_name(self) -> str:
-        return "gap-analysis"
-
-    @property
-    def stage(self) -> str:
-        return "gap_analysis"
+    id = "gap-analysis"
+    name = "Requirement Gap Analysis & RTM"
+    purpose = "Compares requirements against what exists or is specified, producing a gap list and requirements traceability matrix (RTM)."
+    stage = StageEnum.REQUIREMENTS
+    required_inputs = ["business_objectives_and_specs"]
 
     async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
         text_input = input_data.get("normalized_input") or input_data.get("text") or ""
-        stories_input = input_data.get("user_stories") or input_data.get("outputs", {}).get("user_stories") or {}
+        stories_input = input_data.get("agile_stories") or input_data.get("outputs", {}).get("agile_stories") or {}
         ddl3_input = input_data.get("ddl3") or input_data.get("outputs", {}).get("ddl3") or {}
 
         context_str = f"BUSINESS REQUIREMENTS:\n{fit_text(text_input, 4000)}\n\n"
@@ -70,8 +69,8 @@ class GapAnalysisAgent(BaseAgent):
             '    {\n'
             '      "unmet_req_id": "REQ-002",\n'
             '      "description": "...",\n'
-            '      "timeline_impact_weeks": 2,\n'
-            '      "budget_impact_effort": "Medium ($15k / 40 hrs)",\n'
+            '      "timeline_impact_weeks": <number only if the input states it, else null>,\n'
+            '      "budget_impact_effort": "<only if the input states cost or effort, else null>",\n'
             '      "risk_level": "High" | "Medium" | "Low",\n'
             '      "mitigation_strategy": "..."\n'
             '    }\n'
@@ -79,7 +78,7 @@ class GapAnalysisAgent(BaseAgent):
             "}"
         )
 
-        rtm_data = await call_llm(system, context_str, api_key=api_key, expected_type=dict)
+        rtm_data = await call_llm(system + GROUNDING_RULES, context_str, api_key=api_key, expected_type=dict)
 
         if "traceability_matrix" not in rtm_data:
             rtm_data["traceability_matrix"] = []

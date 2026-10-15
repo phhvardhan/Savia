@@ -16,6 +16,11 @@ export function claim(key: string): boolean {
   return true;
 }
 
+/** False once the run was cancelled (Start New Run / Cancel clears every key). */
+export function isClaimed(key: string): boolean {
+  return inFlight.has(key);
+}
+
 /** Let a key run again, e.g. after a failure the person may retry. */
 export function release(key: string): void {
   inFlight.delete(key);

@@ -11,11 +11,18 @@ import { Modal } from '../components/ui/Modal';
 import { agentMeta, artifactExportUrl, summariseContent } from '../lib/savia';
 import type { RecommendedAgent, OutputPart } from '../lib/savia';
 import { useRun } from '../state/run';
-import { useConnectorEnds } from '../hooks/useConnectorEnds';
+import { FanConnector } from '../components/ui/FanConnector';
 import styles from './WritingPage.module.css';
 
 type SectionState = 'Done' | 'Writing' | 'Next';
 type RunPhase = 'idle' | 'running' | 'done' | 'error';
+
+/** The run is one AI call; its sections tick over at this pace so the wait reads as progress. */
+const SECTION_MS = 6000;
+/** When the answer comes in early, the remaining sections finish at this pace. */
+const FINISH_MS = 400;
+/** Figma 05 → 06: once every section is Done, the document opens after this pause. */
+const OPEN_DOCUMENT_MS = 1200;
 
 // Helper to check if item is a structured object
 function isObject(val: unknown): val is Record<string, unknown> {
@@ -42,11 +49,17 @@ export function WritingPage() {
   const error = activeRun?.error ?? null;
   const phase: RunPhase = activeRun?.status ?? (run ? 'done' : 'idle');
 
+  // Set when the run finishes while you watch, so the sections can play out.
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const sawRunning = useRef(phase === 'running');
+  if (phase === 'running') sawRunning.current = true;
+  if (phase === 'done' && sawRunning.current && finishedAt === null) setFinishedAt(Date.now());
+
   useEffect(() => {
-    if (phase !== 'running') return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    if (phase !== 'running' && finishedAt === null) return;
+    const timer = setInterval(() => setNow(Date.now()), finishedAt ? 100 : 1000);
     return () => clearInterval(timer);
-  }, [phase]);
+  }, [phase, finishedAt]);
 
   const elapsed =
     phase === 'running' && activeRun
@@ -66,19 +79,36 @@ export function WritingPage() {
     return true;
   });
 
-  const steps: Array<{ id: string; title: string; state: SectionState; note?: string }> =
-    phase === 'done'
-      ? parts.map((part) => ({ id: part.key, title: part.title, state: 'Done' }))
-      : [
-          { id: 'context', title: 'Receive context packet', state: 'Done' },
-          {
-            id: 'run',
-            title: meta ? `Run ${meta.label} agent` : 'Run agent',
-            state: phase === 'error' ? 'Next' : 'Writing',
-            note: phase === 'error' ? error ?? undefined : 'Grounding output in transcript',
-          },
-          { id: 'write', title: 'Write output', state: 'Next' },
-        ];
+  // The agent's own sections (DDL3: purpose and scope, definitions, design considerations…).
+  // The last one stays "Writing" until the real answer is in.
+  const sectionTitles = meta?.sections.length ? meta.sections : ['Write output'];
+  const timed = (at: number) =>
+    activeRun ? Math.min(Math.floor((at - activeRun.startedAt) / SECTION_MS), sectionTitles.length - 1) : 0;
+  const writing =
+    phase === 'running'
+      ? timed(now)
+      : phase === 'done' && finishedAt
+        ? Math.min(timed(finishedAt) + 1 + Math.floor((now - finishedAt) / FINISH_MS), sectionTitles.length)
+        : phase === 'done'
+          ? sectionTitles.length
+          : 0;
+  const allDone = writing === sectionTitles.length;
+  const steps: Array<{ id: string; title: string; state: SectionState; note?: string }> = sectionTitles.map(
+    (title, i) => ({
+      id: title,
+      title,
+      state: i < writing ? 'Done' : i === writing && phase !== 'error' ? 'Writing' : 'Next',
+      note: phase === 'error' && i === writing ? error ?? undefined : undefined,
+    }),
+  );
+
+  // Opens the document by itself, but only when the run finished while you watched:
+  // coming back to this page later should not bounce you away.
+  useEffect(() => {
+    if (!finishedAt || !allDone) return;
+    const timer = setTimeout(() => navigate('/document'), OPEN_DOCUMENT_MS);
+    return () => clearTimeout(timer);
+  }, [finishedAt, allDone, navigate]);
 
   // Excel only makes sense when the output has tables (stories, actions, test cases…).
   const hasTables = Boolean(
@@ -89,8 +119,9 @@ export function WritingPage() {
   };
 
   const outputsRef = useRef<HTMLDivElement>(null);
-  const connectorRef = useRef<SVGSVGElement>(null);
-  const outputYs = useConnectorEnds(outputsRef, connectorRef, ':scope > button', [parts.length, phase]);
+  const gaveRef = useRef<HTMLDivElement>(null);
+  const hubRef = useRef<HTMLElement>(null);
+  const lineDeps = [parts.length, phase, writing];
 
   // Render formatted HTML content inside Modal (NO raw JSON strings)
   const renderFormattedModalContent = (part: OutputPart) => {
@@ -221,7 +252,7 @@ export function WritingPage() {
           </p>
           <p className={`${styles.columnLabel} ${styles.labelRecommends}`}>What it produced</p>
 
-          <div className={styles.gave}>
+          <div ref={gaveRef} className={styles.gave}>
             <article className={styles.inputCard}>
               <div className={styles.inputHead}>
                 <h3 className={styles.inputTitle}>Context packet</h3>
@@ -249,25 +280,24 @@ export function WritingPage() {
             </article>
           </div>
 
-          <svg
+          <FanConnector
             className={`${styles.connector} ${styles.connectorLeft}`}
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <path d="M0 25 C 45 25, 55 46, 100 46" fill="none" stroke="#C3C4C5" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
-            <path d="M0 75 C 45 75, 55 54, 100 54" fill="none" stroke="#C3C4C5" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
-          </svg>
+            cards={gaveRef}
+            cardSelector=":scope > article"
+            hub={hubRef}
+            hubSide="right"
+            deps={lineDeps}
+          />
 
-          <section className={styles.orchestrator} aria-label="Agent progress">
+          <section ref={hubRef} className={styles.orchestrator} aria-label="Agent progress">
             <div className={styles.orchestratorHead}>
               <h3 className={styles.orchestratorName}>{meta ? meta.label : 'Agent'}</h3>
               <p className={styles.orchestratorState}>
-                {phase === 'done'
-                  ? `${parts.length} parts produced`
+                {phase === 'done' && allDone
+                  ? `${parts.length} parts produced${finishedAt ? ' · opening the document' : ''}`
                   : phase === 'error'
                     ? 'Run failed'
-                    : 'Running'}
+                    : `Section ${Math.min(writing + 1, steps.length)} of ${steps.length}`}
               </p>
             </div>
             {steps.map((item) => (
@@ -279,14 +309,14 @@ export function WritingPage() {
                         ? styles.stepTitleDone
                         : item.state === 'Writing'
                           ? styles.stepTitleWriting
-                          : ''
+                          : styles.stepTitleNext
                     }`}
                   >
                     {item.title}
                   </h4>
                   <span
                     className={`${styles.statePill} ${
-                      item.state === 'Writing' ? styles.stateWriting : styles.stateDone
+                      item.state === 'Writing' ? styles.stateWriting : item.state === 'Next' ? styles.stateNext : styles.stateDone
                     }`}
                   >
                     {item.state === 'Writing' && <span className={styles.stateDot} aria-hidden="true" />}
@@ -298,28 +328,15 @@ export function WritingPage() {
             ))}
           </section>
 
-          <svg
-            ref={connectorRef}
+          <FanConnector
             className={`${styles.connector} ${styles.connectorRight}`}
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            {outputYs.map((end, i) => {
-              // Fan out from the middle of the agent box, one line per output card.
-              const start = 50 + (i - (outputYs.length - 1) / 2) * 4;
-              return (
-                <path
-                  key={i}
-                  d={`M0 ${start} C 50 ${start}, 50 ${end}, 100 ${end}`}
-                  fill="none"
-                  stroke="#C3C4C5"
-                  strokeWidth="1.2"
-                  vectorEffect="non-scaling-stroke"
-                />
-              );
-            })}
-          </svg>
+            cards={outputsRef}
+            cardSelector=":scope > *"
+            hub={hubRef}
+            hubSide="left"
+            deps={lineDeps}
+            line={() => (parts.length === 0 ? { strokeDasharray: '3 3' } : {})}
+          />
 
           <div ref={outputsRef} className={styles.outputs}>
             {phase === 'error' && <div className={styles.recommendError}>{error}</div>}

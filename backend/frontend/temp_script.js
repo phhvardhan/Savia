@@ -5,13 +5,13 @@
 
     const ALL_AGENTS_CONFIG = [
       { id: "mom", name: "MOM Agent", desc: "Minutes of Meeting & Action Items", icon: "fa-list-check" },
-      { id: "user-stories", name: "Agile Stories", desc: "INVEST User Stories & BDD Criteria", icon: "fa-cubes" },
+      { id: "agile-stories", name: "Agile Stories", desc: "INVEST User Stories & BDD Criteria", icon: "fa-cubes" },
       { id: "ddl3", name: "DDL3 Design", desc: "Functional, Technical & Config DDL3 Specs", icon: "fa-diagram-project" },
       { id: "test", name: "Test Agent", desc: "FIT/UAT Inventory & Manual Test Cases", icon: "fa-vial" },
-      { id: "readiness-scoring", name: "Readiness & Audit", desc: "Delivery Readiness Scoring & SDLC Audit", icon: "fa-bullseye" },
+      { id: "readiness-audit", name: "Readiness & Audit", desc: "Delivery Readiness Scoring & SDLC Audit", icon: "fa-bullseye" },
       { id: "gap-analysis", name: "Gap Analysis & RTM", desc: "Requirement Gap Analysis & Traceability Matrix", icon: "fa-magnifying-glass" },
       { id: "change-impact", name: "Change Impact", desc: "Change Impact Assessment & Interdependency Matrix", icon: "fa-route" },
-      { id: "kdd-package", name: "KDD for DAB", desc: "Knowledge Design Document for DAB Review", icon: "fa-box-archive" }
+      { id: "kdd-dab", name: "KDD for DAB", desc: "Knowledge Design Document for DAB Review", icon: "fa-box-archive" }
     ];
 
     function App() {
@@ -466,7 +466,7 @@
                   )}
 
                   {/* READINESS SCORING & AUDIT VISUAL OUTPUT WITH SDLC CYCLE JUSTIFICATION */}
-                  {agentOutput.agent_name === "readiness-scoring" && (
+                  {agentOutput.agent_name === "readiness-audit" && (
                     <div className="space-y-6">
                       {/* Overall Score Banner */}
                       <div className="bg-slate-900/90 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -559,7 +559,7 @@
                   )}
 
                   {/* AGILE USER STORIES & BACKLOG EPICS VISUAL OUTPUT */}
-                  {agentOutput.agent_name === "user-stories" && (
+                  {agentOutput.agent_name === "agile-stories" && (
                     <div className="space-y-6">
                       <div className="bg-slate-900/90 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
@@ -833,7 +833,7 @@
                   )}
 
                   {/* KDD PACKAGE FOR DAB VISUAL OUTPUT */}
-                  {agentOutput.agent_name === "kdd-package" && (
+                  {agentOutput.agent_name === "kdd-dab" && (
                     <div className="space-y-6">
                       <div className="bg-slate-900/90 p-6 rounded-2xl border border-slate-800 space-y-2">
                         <div className="flex justify-between items-center">

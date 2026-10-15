@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
 import { useRun } from '../state/run';
 import { useAttachment } from '../state/attachment';
-import { runAgent, type AgentRun } from '../lib/savia';
+import { agentMeta, runAgent, sectionText, sectionTitle, type AgentRun, type RecommendedAgent } from '../lib/savia';
 import styles from './DocumentPage.module.css';
 
 type OutlineState = 'Traced' | 'Changed' | 'Needs you';
@@ -67,15 +67,28 @@ export function DocumentPage() {
 
   const editorRef = useRef<HTMLDivElement>(null);
 
-  // Active agent identification (Supported 4 agents: mom, ddl3, readiness-scoring, test)
+  // Active agent identification (Supported 4 agents: mom, ddl3, readiness-audit, test)
   const agentId = selectedAgent || recommendation?.primary_agent || 'mom';
   const workflowId = upload?.workflow_id ?? 'default';
   const runKey = `${agentId}:${workflowId}`;
   const cachedRun = agentRuns[runKey];
   const runContent = activeRun?.run?.content || cachedRun?.content || {};
 
+  // Agents with a dedicated layout below; any other agent gets a generic one built from its own output.
+  const hasLayout = ['mom', 'readiness-audit', 'test', 'ddl3'].includes(agentId);
+  const meta = agentMeta(
+    recommendation?.recommended_agents.find((a) => a.agent === agentId) ??
+      ({ agent: agentId, agent_name: agentId } as RecommendedAgent),
+  );
+  const genericSections = hasLayout
+    ? []
+    : Object.entries(runContent as Record<string, unknown>).filter(
+        ([key, value]) => !['title', 'open_questions', 'needs_info'].includes(key) && sectionText(value).trim(),
+      );
+
   // Interactive update & saving state
-  const [isUpdatingMom, setIsUpdatingMom] = useState(false);
+  // The open question whose answer is being sent to the agent (only that card shows "Updating...").
+  const [updatingQuestion, setUpdatingQuestion] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
 
@@ -198,39 +211,48 @@ export function DocumentPage() {
   const [actionItems] = useState<ActionItem[]>(initialActions);
 
   // Dynamic Open Questions (100% dynamic from backend agent output)
-  const rawQuestions = runContent.open_questions as any[];
+  const rawQuestions = (runContent.open_questions ?? runContent.needs_info) as any[];
   const initialQuestions: OpenQuestion[] =
     Array.isArray(rawQuestions) && rawQuestions.length > 0
       ? rawQuestions.map((q, idx) => ({
           id: `Q-${String(idx + 1).padStart(3, '0')}`,
           question: typeof q === 'string' ? q : q.question || String(q),
-          context: typeof q === 'object' && q.context ? q.context : `Identified during ${agentId.toUpperCase()} Agent analysis of ${upload?.filename ?? 'input document'}.`,
-          status: 'Open',
+          context: typeof q === 'object' && q.context ? q.context : `Identified during ${meta.label} Agent analysis of ${upload?.filename ?? 'input document'}.`,
+          status: typeof q === 'object' && q.status === 'Resolved' ? 'Resolved' : 'Open',
+          answer: typeof q === 'object' && q.answer ? q.answer : undefined,
         }))
       : [];
 
   const [questions, setQuestions] = useState<OpenQuestion[]>(initialQuestions);
+  // Draft answers, keyed by question text so they survive the renumbering after a re-run.
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
+
+  // A re-run (answering a question) or a save replaces the run: show its content.
+  useEffect(() => {
+    if (Object.keys(runContent).length === 0) return; // no run yet: a fresh {} each render
+    const summary = runContent.summary || runContent.discussion_summary;
+    if (summary) setSummaryText(String(summary));
+    if (runContent.full_transcript_notes) setMomDetailsText(String(runContent.full_transcript_notes));
+    if (Array.isArray(runContent.key_points) && runContent.key_points.length > 0) {
+      setKeyPoints(runContent.key_points as string[]);
+    }
+    setQuestions(initialQuestions);
+  }, [runContent]);
 
   // Dynamic Document Metadata
   const docFilename = attachment?.name ?? upload?.filename ?? 'WhatsApp Video 2026-08-26 at 11.19.38 PM.mp4';
   const docTitle =
-    agentId === 'mom'
+    !hasLayout
+      ? String(runContent.title || meta.full)
+      : agentId === 'mom'
       ? `MOM_${docFilename.replace(/\.[^/.]+$/, '').toUpperCase()}_MINUTES`
-      : agentId === 'readiness-scoring'
+      : agentId === 'readiness-audit'
       ? `DELIVERY_READINESS_AUDIT_SCORECARD`
       : agentId === 'test'
       ? `TEST_PREPARATION_SUITE_AND_CASES`
       : `DDL3_DESIGN_SPECIFICATION_DOCUMENT`;
 
-  const docAuthor =
-    agentId === 'mom'
-      ? 'Written by MOM Agent'
-      : agentId === 'readiness-scoring'
-      ? 'Evaluated by Readiness & Audit Agent'
-      : agentId === 'test'
-      ? 'Automated by TEST Preparation Agent'
-      : 'Written by DDL3 Design Agent';
+  const docAuthor = `Written by ${meta.label} Agent`;
 
   const docWordCount = upload?.metadata.word_count
     ? `${upload.metadata.word_count.toLocaleString()} words`
@@ -240,7 +262,7 @@ export function DocumentPage() {
   const [activities, setActivities] = useState<ActivityEvent[]>([
     {
       id: 'act-1',
-      title: `${agentId.toUpperCase()} Agent active`,
+      title: `${meta.label} Agent active`,
       note: `Evaluated artifacts from ${docFilename} · just now`,
       time: 'just now',
     },
@@ -274,7 +296,7 @@ export function DocumentPage() {
   // Dynamic Destination ("Where it goes next")
   const destinationMap: Record<string, { title: string; space: string }> = {
     mom: { title: 'Confluence · Meeting Minutes', space: 'Release 2.1 space' },
-    'readiness-scoring': { title: 'SDLC Audit Portal · Quality Gate', space: 'Executive Scorecard Space' },
+    'readiness-audit': { title: 'SDLC Audit Portal · Quality Gate', space: 'Executive Scorecard Space' },
     test: { title: 'Test Automation Repository · Test Suite', space: 'QA Release 2.1 Pack' },
     ddl3: { title: 'Architecture Dossier · DAB Board', space: 'Governance Review' },
   };
@@ -299,7 +321,7 @@ export function DocumentPage() {
         note: unresolvedCount > 0 ? `${unresolvedCount} left` : 'All resolved',
       },
     ],
-    'readiness-scoring': [
+    'readiness-audit': [
       { id: '1', targetId: 'sec-score-ring', name: '1 · Overall Quality Scorecard', state: 'Traced' },
       { id: '2', targetId: 'sec-capabilities', name: '2 · Multi-Dimensional Evaluation', state: 'Traced' },
       { id: '3', targetId: 'sec-sdlc-breakdown', name: '3 · SDLC Lifecycle Stage Breakdown', state: 'Changed', note: 'Audit analysis' },
@@ -335,7 +357,23 @@ export function DocumentPage() {
     ],
   };
 
-  const outlineItems = outlineItemsMap[agentId] || outlineItemsMap.mom;
+  const outlineItems: Array<{ id: string; targetId: string; name: string; state: OutlineState; note?: string }> = hasLayout
+    ? outlineItemsMap[agentId]
+    : [
+        ...genericSections.map(([key], i) => ({
+          id: String(i + 1),
+          targetId: `sec-gen-${key}`,
+          name: `${i + 1} · ${sectionTitle(key)}`,
+          state: 'Traced' as OutlineState,
+        })),
+        {
+          id: String(genericSections.length + 1),
+          targetId: 'sec-questions',
+          name: `${genericSections.length + 1} · Open Questions`,
+          state: (unresolvedCount > 0 ? 'Needs you' : 'Traced') as OutlineState,
+          note: unresolvedCount > 0 ? `${unresolvedCount} left` : 'All resolved',
+        },
+      ];
 
   const scrollToSection = (targetId: string) => {
     setActiveSection(targetId);
@@ -411,45 +449,41 @@ export function DocumentPage() {
     }, 800);
   };
 
-  // Handle answering an open question with backend agent update
-  const handleAnswerQuestion = async (questionId: string) => {
-    const answer = questionAnswers[questionId];
-    if (!answer || !answer.trim()) return;
+  // Answering an open question re-runs this document's agent with every answer given so far,
+  // then shows the new output. Answered questions stay resolved; new ones from the re-run are added.
+  const handleAnswerQuestion = async (q: OpenQuestion) => {
+    const answer = questionAnswers[q.question]?.trim();
+    if (!answer || updatingQuestion) return;
 
-    setIsUpdatingMom(true);
-    setStatusMessage(`Sending answer to MOM Agent to update document...`);
+    setUpdatingQuestion(q.question);
+    setStatusMessage(`Sending your answer to ${meta.label} to update the document...`);
 
-    const updatedQuestions = questions.map((q) =>
-      q.id === questionId ? { ...q, status: 'Resolved' as const, answer: answer.trim() } : q
-    );
-    setQuestions(updatedQuestions);
-
-    const newDecision: Decision = {
-      id: `DEC-${String(decisions.length + 1).padStart(3, '0')}`,
-      text: `Resolved ${questionId}: ${answer.trim()}`,
-      speaker: 'null',
-      context: 'Resolved interactively on document screen',
-    };
-    setDecisions((prev) => [...prev, newDecision]);
+    const resolved = questions
+      .map((item) => (item.question === q.question ? { ...item, status: 'Resolved' as const, answer } : item))
+      .filter((item) => item.status === 'Resolved');
+    const answersText = resolved.map((item) => `Question: ${item.question}\nAnswer: ${item.answer}`).join('\n\n');
 
     try {
-      const updatedInputText = `${upload?.full_normalized_text || summaryText}\n\n[USER ANSWERED QUESTION ${questionId}]: ${answer.trim()}`;
-      const newRun = await runAgent('mom', {
+      const newRun = await runAgent(agentId, {
         workflow_id: upload?.workflow_id,
-        input_text: updatedInputText,
+        input_text: `${upload?.full_normalized_text ?? ''}\n\n[ANSWERS TO OPEN QUESTIONS] The user answered these questions. Treat each answer as a confirmed fact: use it in the document and do not list these questions (or rewordings of them) as open again.\n${answersText}`,
       });
-
-      if (newRun && newRun.content) {
-        saveAgentRun(runKey, newRun);
-      }
-      setStatusMessage(`MOM Agent successfully updated document with resolved question ${questionId}.`);
+      const isAnswered = (text: string) => resolved.some((item) => item.question.trim().toLowerCase() === text.trim().toLowerCase());
+      const fresh = ((newRun.content.open_questions ?? newRun.content.needs_info ?? []) as any[]).filter(
+        (item) => !isAnswered(typeof item === 'string' ? item : item?.question ?? ''),
+      );
+      saveAgentRun(runKey, {
+        ...newRun,
+        content: { ...newRun.content, open_questions: [...resolved, ...fresh] },
+      });
+      setQuestionAnswers((prev) => ({ ...prev, [q.question]: '' }));
+      setStatusMessage(`${meta.label} updated the document with your answer.`);
     } catch (err) {
-      console.warn('Backend update failed, using updated client state:', err);
-      setStatusMessage(`MOM updated locally with resolved question ${questionId}.`);
+      console.warn('Answer update failed:', err);
+      setStatusMessage(`Could not update the document: ${err instanceof Error ? err.message : 'the agent run failed'}. Your answer is still in the box.`);
     } finally {
-      setIsUpdatingMom(false);
-      setQuestionAnswers((prev) => ({ ...prev, [questionId]: '' }));
-      setTimeout(() => setStatusMessage(''), 4000);
+      setUpdatingQuestion(null);
+      setTimeout(() => setStatusMessage(''), 6000);
     }
   };
 
@@ -535,8 +569,8 @@ export function DocumentPage() {
     total_tests: Array.isArray(runContent.test_cases) ? runContent.test_cases.length : 0,
     fit_count: Array.isArray(runContent.test_cases) ? runContent.test_cases.filter((tc: any) => tc.type === 'FIT').length : 0,
     uat_count: Array.isArray(runContent.test_cases) ? runContent.test_cases.filter((tc: any) => tc.type === 'UAT').length : 0,
-    coverage_percentage: Array.isArray(runContent.test_cases) && runContent.test_cases.length > 0 ? 94 : 0,
-    focus_areas: ['Functional Integration', 'User Acceptance', 'Error Resilience'],
+    coverage_percentage: null,
+    focus_areas: [],
   };
 
   const testInventoryList = Array.isArray(runContent.test_inventory) ? (runContent.test_inventory as any[]) : [];
@@ -562,7 +596,7 @@ export function DocumentPage() {
 
   // Section title & subtitle dynamic per agent
   const sectionHeaderTitles: Record<string, { title: string; subtitle: string }> = {
-    'readiness-scoring': {
+    'readiness-audit': {
       title: 'Delivery Readiness & SDLC Audit Scorecard',
       subtitle: 'Executive quality score evaluation, multi-dimensional grade breakdown, score justification rationale, deficits, and remediation roadmap.',
     },
@@ -579,7 +613,10 @@ export function DocumentPage() {
       subtitle: 'Outline on the left, interactive document canvas in the middle, review status on the right. FIT & UAT test scenario inventory, manual test case step matrix, and scenario stitching.',
     },
   };
-  const currentHeader = sectionHeaderTitles[agentId] || sectionHeaderTitles.mom;
+  const currentHeader = sectionHeaderTitles[agentId] || {
+    title: meta.full,
+    subtitle: `${meta.output}. Outline on the left, the document in the middle, review status on the right.`,
+  };
 
   return (
     <Section
@@ -598,7 +635,7 @@ export function DocumentPage() {
           </div>
         )}
 
-        {agentId === 'readiness-scoring' ? (
+        {agentId === 'readiness-audit' ? (
           /* DEDICATED READINESS & AUDIT EXECUTIVE SCORECARD DASHBOARD VIEW */
           <div className={styles.scorecardContainer}>
             {/* Executive Scorecard Top Bar */}
@@ -613,13 +650,13 @@ export function DocumentPage() {
                 </p>
               </div>
               <div className={styles.docActions}>
-                <Button small variant="secondary" onClick={() => selectAgent('readiness-scoring')}>
+                <Button small variant="secondary" onClick={() => selectAgent('readiness-audit')}>
                   Re-run Audit
                 </Button>
                 <Button small variant="secondary" onClick={() => window.print()}>
                   Export Scorecard
                 </Button>
-                <Button variant="primary" small onClick={() => navigate('/change')}>
+                <Button variant="primary" small onClick={() => navigate('/sharing')}>
                   Send for approval
                 </Button>
               </div>
@@ -816,10 +853,10 @@ export function DocumentPage() {
                 <Button small variant="secondary" onClick={handleSaveDocument} disabled={isSaving}>
                   {isSaving ? 'Saving...' : 'Save Changes'}
                 </Button>
-                <Button small onClick={() => handleOpenAskSavia('Executive Summary')}>
+                <Button small onClick={() => navigate('/change')}>
                   Ask Savia
                 </Button>
-                <Button variant="primary" small onClick={() => navigate('/change')}>
+                <Button variant="primary" small onClick={() => navigate('/sharing')}>
                   Send for approval
                 </Button>
               </div>
@@ -1100,8 +1137,12 @@ export function DocumentPage() {
                               <span className={styles.testStatLabel}>UAT (Acceptance)</span>
                             </div>
                             <div className={styles.testSummaryStat}>
-                              <span className={styles.testStatValue}>{testSummary.coverage_percentage ?? (testCasesList.length > 0 ? 94 : 0)}%</span>
-                              <span className={styles.testStatLabel}>Coverage Est.</span>
+                              <span className={styles.testStatValue}>
+                                {testSummary.coverage_percentage == null ? '—' : `${testSummary.coverage_percentage}%`}
+                              </span>
+                              <span className={styles.testStatLabel}>
+                                {testSummary.untested_ids?.length ? `Coverage · untested ${testSummary.untested_ids.join(', ')}` : 'Story coverage'}
+                              </span>
                             </div>
                           </div>
 
@@ -1155,7 +1196,7 @@ export function DocumentPage() {
                           </div>
                         ) : (
                           <div className={styles.emptyStateBox}>
-                            No test inventory items available. Run the TEST Preparation Agent to populate the inventory.
+                            No test inventory items available. Run the TEST Agent to populate the inventory.
                           </div>
                         )}
                       </section>
@@ -1208,7 +1249,7 @@ export function DocumentPage() {
                           ))
                         ) : (
                           <div className={styles.emptyStateBox}>
-                            No test cases generated yet. Run the TEST Preparation Agent to create end-to-end test cases.
+                            No test cases generated yet. Run the TEST Agent to create end-to-end test cases.
                           </div>
                         )}
                       </section>
@@ -1243,7 +1284,7 @@ export function DocumentPage() {
                           ))
                         ) : (
                           <div className={styles.emptyStateBox}>
-                            No orchestrated test scenarios found. Running the TEST Preparation Agent produces end-to-end scenario stitching.
+                            No orchestrated test scenarios found. Running the TEST Agent produces end-to-end scenario stitching.
                           </div>
                         )}
                       </section>
@@ -1480,10 +1521,45 @@ export function DocumentPage() {
                     </>
                   )}
 
-                  {/* Section 6: Open Questions & Interactive Resolution */}
+                  {/* ANY OTHER AGENT: one section per part of its output */}
+                  {genericSections.map(([key, value], idx) => {
+                    const rows =
+                      Array.isArray(value) && value.length > 0 && value.every((r) => r && typeof r === 'object' && !Array.isArray(r))
+                        ? (value as Record<string, unknown>[])
+                        : null;
+                    const columns = rows ? [...new Set(rows.flatMap((r) => Object.keys(r)))] : [];
+                    return (
+                      <section key={key} id={`sec-gen-${key}`} className={styles.docSection}>
+                        <div className={styles.docSectionHead}>
+                          <span className={styles.docSectionNum}>{idx + 1}</span>
+                          <h3 className={styles.docSectionTitle}>{sectionTitle(key)}</h3>
+                        </div>
+                        {rows ? (
+                          <div className={styles.tableWrapper}>
+                            <table className={styles.actionTable}>
+                              <thead>
+                                <tr>{columns.map((c) => <th key={c}>{sectionTitle(c)}</th>)}</tr>
+                              </thead>
+                              <tbody>
+                                {rows.map((row, i) => (
+                                  <tr key={i}>{columns.map((c) => <td key={c}>{sectionText(row[c])}</td>)}</tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className={styles.paragraph} style={{ whiteSpace: 'pre-wrap' }}>{sectionText(value)}</p>
+                        )}
+                      </section>
+                    );
+                  })}
+
+                  {/* Open Questions & Interactive Resolution */}
                   <section id="sec-questions" className={styles.docSection}>
                     <div className={styles.docSectionHead}>
-                      <span className={styles.docSectionNum}>6</span>
+                      <span className={styles.docSectionNum}>
+                        {outlineItems.find((item) => item.targetId === 'sec-questions')?.id ?? outlineItems.length + 1}
+                      </span>
                       <h3 className={styles.docSectionTitle}>Open Questions</h3>
                     </div>
 
@@ -1501,19 +1577,19 @@ export function DocumentPage() {
                                 rows={2}
                                 className={styles.answerInput}
                                 placeholder="Type your answer here to resolve this open question and update the document with backend agent..."
-                                value={questionAnswers[q.id] || ''}
+                                value={questionAnswers[q.question] || ''}
                                 onChange={(e) =>
-                                  setQuestionAnswers({ ...questionAnswers, [q.id]: e.target.value })
+                                  setQuestionAnswers((prev) => ({ ...prev, [q.question]: e.target.value }))
                                 }
                               />
                               <div className={styles.answerBtnRow}>
                                 <Button
                                   variant="primary"
                                   small
-                                  disabled={!questionAnswers[q.id]?.trim() || isUpdatingMom}
-                                  onClick={() => handleAnswerQuestion(q.id)}
+                                  disabled={!questionAnswers[q.question]?.trim() || updatingQuestion !== null}
+                                  onClick={() => handleAnswerQuestion(q)}
                                 >
-                                  {isUpdatingMom ? 'Updating...' : 'Answer & Update Document'}
+                                  {updatingQuestion === q.question ? 'Updating...' : 'Answer & Update Document'}
                                 </Button>
                               </div>
                             </div>
@@ -1589,7 +1665,7 @@ export function DocumentPage() {
             </p>
           </div>
           <div className={styles.footerActions}>
-            <Button variant="primary" onClick={() => navigate('/change')}>
+            <Button variant="primary" onClick={() => navigate('/sharing')}>
               Send for approval
             </Button>
             <Button onClick={() => navigate('/reading')}>Back to recommendations</Button>

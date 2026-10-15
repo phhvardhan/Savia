@@ -47,7 +47,7 @@ class StageManager:
             # Special allowance if MOM or requirements exist in session output
             if prereq == StageEnum.MOM and session.outputs.get("mom"):
                 continue
-            if prereq == StageEnum.USER_STORY and session.outputs.get("user_stories"):
+            if prereq == StageEnum.USER_STORY and session.outputs.get("agile_stories"):
                 continue
             if prereq == StageEnum.DDL3 and session.outputs.get("ddl3"):
                 continue

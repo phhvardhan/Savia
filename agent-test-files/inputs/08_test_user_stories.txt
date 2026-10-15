@@ -1,0 +1,14 @@
+Northwind Pharma - User stories ready for test (Rotterdam stock sync pilot)
+
+US-01  Stock movement reaches SAP within 5 minutes
+  As a supply planner, I want WMS stock movements reflected in SAP within 5 minutes, so that availability is accurate.
+  AC1  Given a putaway of 10 units of material M-1001 in plant NL01, when the WMS publishes the event, then SAP stock for M-1001 increases by 10 within 5 minutes.
+  AC2  Given an event with quantity 0, when it reaches the integration layer, then it is rejected and nothing is posted to SAP.
+
+US-02  Alert on failed posting
+  As an integration support analyst, I want an alert within 15 minutes when a stock posting fails, so that I can fix it before planners notice.
+  AC1  Given SAP rejects a posting, when 15 minutes have passed, then an alert email has been sent to the integration support mailbox with the movement_id.
+
+US-03  Duplicate events are ignored
+  As a supply planner, I want duplicate events ignored, so that stock is not counted twice.
+  AC1  Given movement_id MV-500 was already posted, when the same event arrives again, then SAP stock does not change and the duplicate is logged.

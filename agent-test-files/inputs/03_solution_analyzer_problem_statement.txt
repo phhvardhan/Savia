@@ -1,0 +1,12 @@
+Problem statement - Northwind Pharma
+
+Our warehouse stock levels in SAP S/4HANA do not match the Manhattan WMS. The mismatch is only found during the nightly batch reconciliation, so planners at the Rotterdam distribution centre see wrong availability for up to a day. Customer service promises orders we cannot ship, and Rotterdam reports frequent shipment delays.
+
+What we know:
+- The WMS sends stock to SAP once a night as a file over SFTP.
+- Any fix must stay GxP compliant (full audit trail of stock changes).
+- We cannot change the SAP core; only standard interfaces are allowed.
+
+What we don't know yet: transaction volumes per day, budget, and the target go-live date.
+
+How should we solve this?

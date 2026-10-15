@@ -185,10 +185,12 @@
 }
 
 .recommendChosen {
-  border-color: #005EEB;
-  background: #005EEB;
+  border-color: var(--tone, #005EEB);
+  background: var(--tone, #005EEB);
   color: #FFFFFF;
-  box-shadow: 0 10px 22px -12px #005EEB;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--tone, #005EEB) 22%, transparent),
+    0 12px 28px -10px var(--tone, #005EEB);
 }
 
 .recommendHead {
@@ -218,7 +220,7 @@
   padding: 5px 10px;
   border-radius: var(--radius-sm);
   background: #FFFFFF;
-  color: #005EEB;
+  color: var(--tone, #005EEB);
   font-size: 12px;
   font-weight: 600;
 }
@@ -230,7 +232,7 @@
 .statsBorder { border-top: 1px solid var(--line-soft); }
 
 /* Plan table (merged in from the old Plan page) */
-.rank { font-weight: 700; color: var(--brand-red); }
+.rank { font-weight: 700; color: var(--tone, var(--brand-red)); }
 .approvalPill {
   display: inline-flex;
   align-items: center;
@@ -360,6 +362,7 @@
   letter-spacing: 0.03em;
   color: var(--text-soft);
 }
+.recommendChosen .confidence { color: #FFFFFFD0; }
 
 .recommendPending,
 .recommendError {
@@ -399,6 +402,45 @@
 }
 
 .recommendButton:not(.recommendChosen):hover {
-  border-color: #005EEB;
-  box-shadow: 0 4px 12px 0 #005EEB1F;
+  border-color: var(--tone, #005EEB);
+  box-shadow: 0 4px 12px 0 color-mix(in srgb, var(--tone, #005EEB) 12%, transparent);
 }
+
+/* Loading screen (ReadingLoader) ------------------------------------------ */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.skeleton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-canvas);
+}
+
+.skeletonRank { font-weight: 700; color: var(--text-soft); }
+
+.skeletonBar {
+  flex: 1;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--chip) 25%, var(--line-soft) 50%, var(--chip) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.tip { padding: 20px 30px; border-top: 1px solid var(--line-soft); }
+.tipLabel { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-soft); }
+.tipBody { margin-top: 8px; font-size: 15px; line-height: 148%; color: var(--text-muted); animation: riseIn 0.45s ease-out; }
+
+.reveal .recommend:nth-child(4) { animation-delay: 0.85s; }
+.reveal .recommend:nth-child(5) { animation-delay: 1.00s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBar, .tipBody { animation: none; }
+}
+.inputItem { overflow-wrap: anywhere; }

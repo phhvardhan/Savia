@@ -1,142 +1,125 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { DataTable } from '../components/ui/DataTable';
 import { Section } from '../components/ui/Section';
 import { StatusPill } from '../components/ui/StatusPill';
+import { ApiError } from '../lib/api';
+import { AGENT_META, approveWorkflow } from '../lib/savia';
+import { useRun, useCurrentRun } from '../state/run';
 import styles from './SharingPage.module.css';
 
-type Status = 'asked' | 'commented' | 'idle' | 'none';
-
-const PEOPLE: Array<{
-  id: string;
-  initials: string;
-  name: string;
-  title: string;
-  role: string;
-  can: string;
-  status: string;
-  statusKind: Status;
-}> = [
-  {
-    id: 'blanco',
-    initials: 'DB',
-    name: 'D. Blanco',
-    title: 'Design Lead',
-    role: 'Approver',
-    can: 'Decides. Nothing moves downstream without them',
-    status: 'Asked 4 min ago',
-    statusKind: 'asked',
-  },
-  {
-    id: 'kumar',
-    initials: 'RK',
-    name: 'R. Kumar',
-    title: 'Business Analyst',
-    role: 'Editor',
-    can: 'Edit and comment. Asked about AC-002',
-    status: 'Commented',
-    statusKind: 'commented',
-  },
-  {
-    id: 'pieretti',
-    initials: 'MP',
-    name: 'M. Pieretti',
-    title: 'Test Lead',
-    role: 'Viewer',
-    can: 'Read only she needs the context, not the pen',
-    status: 'Has not opened it',
-    statusKind: 'idle',
-  },
-  {
-    id: 'you',
-    initials: 'YOU',
-    name: 'You',
-    title: 'Business Analyst',
-    role: 'Owner',
-    can: 'Everything, including who else is on it',
-    status: '—',
-    statusKind: 'none',
-  },
-];
-
-const STATUS_CLASS: Record<Status, string> = {
-  asked: styles.statusAsked,
-  commented: styles.statusCommented,
-  idle: styles.statusIdle,
-  none: '',
-};
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 3)
+    .toUpperCase();
 
 export function SharingPage() {
   const navigate = useNavigate();
+  const { upload } = useRun();
+  const { agentId, run } = useCurrentRun();
+  const meta = agentId ? AGENT_META[agentId] : undefined;
+  const approver = meta?.approver ?? 'You';
+  const selfApproved = approver === 'You';
+  const [approved, setApproved] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!run || !meta) {
+    return (
+      <Section id="sharing" title="Nothing to send for approval yet" size="compact">
+        <Card panel className={styles.panel}>
+          <div className={styles.actions}>
+            <Button variant="primary" onClick={() => navigate('/work')}>
+              Start a run
+            </Button>
+          </div>
+        </Card>
+      </Section>
+    );
+  }
+
+  // Only the people this run actually has: whoever approves this agent's output, and you.
+  const people = [
+    ...(selfApproved
+      ? []
+      : [
+          {
+            id: 'approver',
+            name: approver,
+            role: 'Approver',
+            can: 'Decides. Nothing is published without this approval',
+            status: approved ? 'Approved' : 'Asked just now',
+          },
+        ]),
+    {
+      id: 'you',
+      name: 'You',
+      role: selfApproved ? 'Owner and approver' : 'Owner',
+      can: selfApproved ? 'Approves your own output for this agent' : 'Everything, including who else is on it',
+      status: selfApproved ? (approved ? 'Approved' : 'Your turn') : '—',
+    },
+  ];
+
+  const approve = async () => {
+    if (!upload) return;
+    setWorking(true);
+    setError(null);
+    try {
+      await approveWorkflow(upload.workflow_id, approver);
+      setApproved(true);
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'The approval could not be recorded.');
+    } finally {
+      setWorking(false);
+    }
+  };
 
   return (
     <Section
       id="sharing"
       title="Who sees it, who comments, who decides"
       size="compact"
-      subtitle="Sharing gives someone access. Approving is a decision on the record."
+      subtitle={`${meta.full} · version ${run.version}. Sharing gives someone access. Approving is a decision on the record.`}
       aside={
-        <StatusPill tone="alert" dot>
-          1 approval outstanding
-        </StatusPill>
+        approved ? (
+          <StatusPill tone="done">Approved</StatusPill>
+        ) : (
+          <StatusPill tone="alert" dot>
+            1 approval outstanding
+          </StatusPill>
+        )
       }
     >
       <Card panel className={styles.panel}>
-        <div className={styles.block}>
-          <h2 className={styles.label}>Add someone</h2>
-          <div className={styles.addRow}>
-            <div className={styles.field}>
-              <span className={styles.fieldIcon} aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <circle cx="7" cy="6" r="3" />
-                  <path d="M2.5 15c0-2.5 2-4.2 4.5-4.2S11.5 12.5 11.5 15" strokeLinecap="round" />
-                  <path d="M13 6.5h3.5M14.75 4.75v3.5" strokeLinecap="round" />
-                </svg>
-              </span>
-              <label className="visually-hidden" htmlFor="share-person">
-                Name or email
-              </label>
-              <input id="share-person" className={styles.fieldInput} placeholder="Name or email" />
-            </div>
-            <Button>Add as viewer</Button>
-            <Button>Add as editor</Button>
-            <Button variant="primary">Add as approver</Button>
-          </div>
-        </div>
-
         <DataTable
-          caption="Who has access to this document and what they can do"
+          caption="Who has access to this output and what they can do"
           columns={[
-            { key: 'person', label: 'Person', width: '26%' },
-            { key: 'role', label: 'Role on this document', width: '18%' },
+            { key: 'person', label: 'Person', width: '30%' },
+            { key: 'role', label: 'Role on this output', width: '20%' },
             { key: 'can', label: 'What they can do' },
             { key: 'status', label: 'Status', width: '17%' },
           ]}
-          rows={PEOPLE.map((person) => ({
+          rows={people.map((person) => ({
             id: person.id,
             cells: [
               <span key="person" className={styles.person}>
                 <span className={styles.avatar} aria-hidden="true">
-                  {person.initials}
+                  {initials(person.name)}
                 </span>
-                <span>
-                  <span className={styles.personName}>{person.name}</span>{' '}
-                  <span className={styles.personRole}>· {person.title}</span>
-                </span>
+                <span className={styles.personName}>{person.name}</span>
               </span>,
-              <button key="role" type="button" className={styles.roleSelect}>
-                {person.role}
-                <span className={styles.caret} aria-hidden="true">
-                  ▾
-                </span>
-              </button>,
+              person.role,
               person.can,
-              person.statusKind === 'none' ? (
+              person.status === '—' ? (
                 person.status
               ) : (
-                <span key="status" className={`${styles.statusPill} ${STATUS_CLASS[person.statusKind]}`}>
-                  {person.statusKind === 'asked' && <span className={styles.statusDot} aria-hidden="true" />}
+                <span key="status" className={`${styles.statusPill} ${approved ? styles.statusCommented : styles.statusAsked}`}>
+                  {!approved && <span className={styles.statusDot} aria-hidden="true" />}
                   {person.status}
                 </span>
               ),
@@ -148,29 +131,38 @@ export function SharingPage() {
           <h2 className={styles.label}>The approval</h2>
           <div className={styles.approval}>
             <span className={styles.approvalAvatar} aria-hidden="true">
-              DB
+              {initials(approver)}
             </span>
             <div className={styles.approvalText}>
               <p className={styles.approvalTitle}>
-                Waiting on D. Blanco <span className={styles.approvalAge}>· asked 4 minutes ago</span>
+                {approved
+                  ? `Approved by ${approver}`
+                  : selfApproved
+                    ? 'This one is yours to approve'
+                    : `Waiting on the ${approver}`}
               </p>
               <p className={styles.approvalNote}>
-                Version 2, with your note about the open question attached. If they request changes it comes back to
-                you with their comments on the exact sections.
+                {error ??
+                  (approved
+                    ? 'Recorded on the run. You can publish it now.'
+                    : `Version ${run.version} of the ${meta.label} output. If changes are needed, go back to the document and ask Savia.`)}
               </p>
             </div>
             <div className={styles.approvalActions}>
-              <Button>Send a reminder</Button>
-              <Button>Change the approver</Button>
+              {!approved && (
+                <Button onClick={approve} disabled={working}>
+                  {working ? 'Recording…' : selfApproved ? 'Approve it' : `Record the ${approver}'s approval`}
+                </Button>
+              )}
+              <Button onClick={() => navigate('/document')}>Back to the document</Button>
             </div>
           </div>
         </div>
 
         <div className={styles.actions}>
-          <Button variant="primary" onClick={() => navigate('/publish')}>
-            Open the document
+          <Button variant="primary" disabled={!approved} onClick={() => navigate('/publish', { state: { approvedBy: approver } })}>
+            Continue to publish
           </Button>
-          <Button>See what they will see</Button>
         </div>
       </Card>
     </Section>

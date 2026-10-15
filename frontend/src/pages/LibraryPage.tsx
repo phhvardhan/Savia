@@ -1,3 +1,4 @@
+import { AGENT_META } from '../lib/savia';
 import { useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import { LIBRARY_ROWS, STATE_TONE, type AgentState } from '../data/agents';
@@ -31,14 +32,14 @@ const PROMPT_PLACEHOLDER = 'I need test cases for a change we have already desig
 /** One mark per agent, keyed by the ids in data/agents.ts. */
 const AGENT_ICONS: Record<string, ComponentType> = {
   mom: NotesIcon,
-  stories: StackIcon,
-  rtm: MatrixIcon,
+  'agile-stories': StackIcon,
+  'gap-analysis': MatrixIcon,
   ddl3: BlueprintIcon,
-  architecture: LayersIcon,
-  kdd: DossierIcon,
-  change: BranchIcon,
+  'solution-analyzer': LayersIcon,
+  'kdd-dab': DossierIcon,
+  'change-impact': BranchIcon,
   test: FlaskIcon,
-  readiness: TargetIcon,
+  'readiness-audit': TargetIcon,
   cutover: FlagIcon,
 };
 
@@ -58,23 +59,23 @@ const FILTERS: Array<{ id: string; label: string; state?: AgentState }> = [
 
 const PICKS = [
   {
-    id: 'kdd',
+    id: 'kdd-dab',
     stage: 'Design',
-    title: 'KDD for DAB',
+    title: AGENT_META['kdd-dab'].label,
     body: 'Your design is approved and the DAB meets in nine days. This builds the dossier from the design and the architecture you already have.',
     meta: '~12 min · Works after DDL3',
   },
   {
-    id: 'change',
+    id: 'change-impact',
     stage: 'Change',
-    title: 'Change impact',
+    title: AGENT_META['change-impact'].label,
     body: 'The field length change this morning touches one downstream report. This finds the rest before SIT does.',
     meta: '~20 min · Works alongside TEST',
   },
   {
-    id: 'rtm',
+    id: 'gap-analysis',
     stage: 'Requirements',
-    title: 'Requirement gap & RTM',
+    title: AGENT_META['gap-analysis'].label,
     body: 'Two of your acceptance criteria were thin enough to cost you coverage. This catches that at the requirements stage instead.',
     meta: '~8 min · Works before DDL3',
   },

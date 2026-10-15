@@ -1,3 +1,4 @@
+import { AGENT_META } from '../lib/savia';
 import type { BadgeTone } from '../components/ui/Badge';
 
 export type AgentState = 'Available' | 'In review' | 'Coming soon';
@@ -20,7 +21,7 @@ export interface Agent {
 export const AGENTS: Agent[] = [
   {
     id: 'mom',
-    name: 'Minutes of Meeting (MoM) & Action Items Matrix',
+    name: AGENT_META['mom'].full,
     stage: 'Requirements',
     state: 'Available',
     capabilities: [
@@ -31,8 +32,8 @@ export const AGENTS: Agent[] = [
     ],
   },
   {
-    id: 'stories',
-    name: 'Agile User Stories & Backlog Epics',
+    id: 'agile-stories',
+    name: AGENT_META['agile-stories'].full,
     stage: 'Requirements',
     state: 'Coming soon',
     capabilities: [
@@ -43,8 +44,8 @@ export const AGENTS: Agent[] = [
     ],
   },
   {
-    id: 'rtm',
-    name: 'Requirement Gap Analysis & Traceability Matrix (RTM)',
+    id: 'gap-analysis',
+    name: AGENT_META['gap-analysis'].full,
     stage: 'Requirements',
     state: 'Available',
     capabilities: [
@@ -56,7 +57,7 @@ export const AGENTS: Agent[] = [
   },
   {
     id: 'ddl3',
-    name: 'DDL3 Design Document Lifecycle',
+    name: AGENT_META['ddl3'].full,
     stage: 'Design',
     state: 'Available',
     capabilities: [
@@ -67,8 +68,8 @@ export const AGENTS: Agent[] = [
     ],
   },
   {
-    id: 'architecture',
-    name: 'Enterprise Solution Architecture & Blueprints',
+    id: 'solution-analyzer',
+    name: AGENT_META['solution-analyzer'].full,
     stage: 'Design',
     state: 'In review',
     capabilities: [
@@ -79,8 +80,8 @@ export const AGENTS: Agent[] = [
     ],
   },
   {
-    id: 'kdd',
-    name: 'KDD Package (Knowledge Design Document) for DAB',
+    id: 'kdd-dab',
+    name: AGENT_META['kdd-dab'].full,
     stage: 'Design governance',
     state: 'Available',
     capabilities: [
@@ -91,8 +92,8 @@ export const AGENTS: Agent[] = [
     ],
   },
   {
-    id: 'change',
-    name: 'Change Impact Assessment & Interdependency Matrix',
+    id: 'change-impact',
+    name: AGENT_META['change-impact'].full,
     stage: 'Change',
     state: 'Available',
     capabilities: [
@@ -104,7 +105,7 @@ export const AGENTS: Agent[] = [
   },
   {
     id: 'test',
-    name: 'TEST — End-to-end Test Preparation',
+    name: AGENT_META['test'].full,
     stage: 'Testing',
     state: 'Available',
     capabilities: [
@@ -115,8 +116,8 @@ export const AGENTS: Agent[] = [
     ],
   },
   {
-    id: 'readiness',
-    name: 'Delivery Readiness Scoring & SDLC Audit',
+    id: 'readiness-audit',
+    name: AGENT_META['readiness-audit'].full,
     stage: 'Release',
     state: 'Coming soon',
     capabilities: [
@@ -154,7 +155,7 @@ export interface LibraryRow {
 export const LIBRARY_ROWS: LibraryRow[] = [
   {
     id: 'mom',
-    name: 'Minutes of Meeting (MoM) & Action Items',
+    name: AGENT_META['mom'].full,
     stage: 'Requirements',
     needs: 'A recording, transcript or notes',
     produces: 'Minutes, decisions & owned actions',
@@ -162,8 +163,8 @@ export const LIBRARY_ROWS: LibraryRow[] = [
     state: 'Available',
   },
   {
-    id: 'stories',
-    name: 'Agile User Stories & Backlog Epics',
+    id: 'agile-stories',
+    name: AGENT_META['agile-stories'].full,
     stage: 'Requirements',
     needs: 'Minutes or a BRD',
     produces: 'INVEST stories, BDD criteria, points',
@@ -171,8 +172,8 @@ export const LIBRARY_ROWS: LibraryRow[] = [
     state: 'Coming soon',
   },
   {
-    id: 'rtm',
-    name: 'Requirement Gap Analysis & RTM',
+    id: 'gap-analysis',
+    name: AGENT_META['gap-analysis'].full,
     stage: 'Requirements',
     needs: 'A BRD and the stories',
     produces: 'Gap list and traceability matrix',
@@ -181,7 +182,7 @@ export const LIBRARY_ROWS: LibraryRow[] = [
   },
   {
     id: 'ddl3',
-    name: 'DDL3 Design Document Lifecycle',
+    name: AGENT_META['ddl3'].full,
     stage: 'Design',
     needs: 'Approved stories or a BRD',
     produces: 'Functional, technical & config designs',
@@ -189,8 +190,8 @@ export const LIBRARY_ROWS: LibraryRow[] = [
     state: 'Available',
   },
   {
-    id: 'architecture',
-    name: 'Enterprise Solution Architecture',
+    id: 'solution-analyzer',
+    name: AGENT_META['solution-analyzer'].full,
     stage: 'Design',
     needs: 'Design documents',
     produces: 'Enterprise solution blueprint',
@@ -198,8 +199,8 @@ export const LIBRARY_ROWS: LibraryRow[] = [
     state: 'In review',
   },
   {
-    id: 'kdd',
-    name: 'KDD Package for DAB',
+    id: 'kdd-dab',
+    name: AGENT_META['kdd-dab'].full,
     stage: 'Design governance',
     needs: 'Design plus architecture',
     produces: 'A DAB-ready dossier',
@@ -207,8 +208,8 @@ export const LIBRARY_ROWS: LibraryRow[] = [
     state: 'Available',
   },
   {
-    id: 'change',
-    name: 'Change Impact & Interdependency',
+    id: 'change-impact',
+    name: AGENT_META['change-impact'].full,
     stage: 'Change',
     needs: 'A design and the landscape',
     produces: 'Impact and interdependency matrix',
@@ -217,7 +218,7 @@ export const LIBRARY_ROWS: LibraryRow[] = [
   },
   {
     id: 'test',
-    name: 'TEST',
+    name: AGENT_META['test'].full,
     stage: 'Testing',
     needs: 'An approved design and its criteria',
     produces: 'Inventory, cases, coverage, plans',
@@ -225,8 +226,8 @@ export const LIBRARY_ROWS: LibraryRow[] = [
     state: 'Available',
   },
   {
-    id: 'readiness',
-    name: 'Delivery Readiness & SDLC Audit',
+    id: 'readiness-audit',
+    name: AGENT_META['readiness-audit'].full,
     stage: 'Release',
     needs: 'Everything upstream',
     produces: 'Readiness scorecard and SDLC audit',

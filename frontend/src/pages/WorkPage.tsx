@@ -22,14 +22,14 @@ import styles from './WorkPage.module.css';
 /** Same marks as the Library table, keyed by the ids in data/agents.ts. */
 const AGENT_ICONS: Record<string, ComponentType> = {
   mom: NotesIcon,
-  stories: StackIcon,
-  rtm: MatrixIcon,
+  'agile-stories': StackIcon,
+  'gap-analysis': MatrixIcon,
   ddl3: BlueprintIcon,
-  architecture: LayersIcon,
-  kdd: DossierIcon,
-  change: BranchIcon,
+  'solution-analyzer': LayersIcon,
+  'kdd-dab': DossierIcon,
+  'change-impact': BranchIcon,
   test: FlaskIcon,
-  readiness: TargetIcon,
+  'readiness-audit': TargetIcon,
   cutover: FlagIcon,
 };
 

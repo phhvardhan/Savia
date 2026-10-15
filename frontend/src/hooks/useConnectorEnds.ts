@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type DependencyList, type RefObject } from 'react';
+import { useEffect, useState, type DependencyList, type RefObject } from 'react';
 
 /**
  * Where each card in `list` sits, as % of the connector svg's height, so the
@@ -13,7 +13,9 @@ export function useConnectorEnds(
 ): number[] {
   const [ends, setEnds] = useState<number[]>([]);
 
-  useLayoutEffect(() => {
+  // useEffect, not useLayoutEffect: it runs after every ref on the page is attached,
+  // including boxes rendered after the connector.
+  useEffect(() => {
     const listEl = list.current;
     const svgEl = svg.current;
     if (!listEl || !svgEl) return;

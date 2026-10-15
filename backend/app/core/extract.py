@@ -307,8 +307,17 @@ def extract_txt(file_path: str) -> str:
 
 
 def extract_docx(file_path: str) -> str:
-    doc = Document(file_path)
-    return "\n".join(p.text for p in doc.paragraphs if p.text)
+    """Paragraphs and tables in document order; requirement docs often keep their content in tables."""
+    parts = []
+    for block in Document(file_path).iter_inner_content():
+        if hasattr(block, "rows"):
+            rows = [" | ".join(c.text.strip().replace("\n", " ") for c in row.cells) for row in block.rows]
+            rows = [r for r in rows if r.strip(" |")]
+            if rows:
+                parts.append("[Table]\n" + "\n".join(rows))
+        elif block.text:
+            parts.append(block.text)
+    return "\n".join(parts)
 
 
 def _pptx_shape_text(shape) -> list[str]:

@@ -1,6 +1,7 @@
 import json
 from typing import Dict, Any, Optional
-from app.agents.base import BaseAgent
+from app.agents.base import BaseAgent, GROUNDING_RULES
+from app.models.workflow import StageEnum
 from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
@@ -11,13 +12,11 @@ class ChangeImpactAgent(BaseAgent):
     Evaluates cross-platform impacts (legacy vs target), cross-workstream dependencies,
     operational readiness, and formats an interdependency matrix.
     """
-    @property
-    def agent_name(self) -> str:
-        return "change-impact"
-
-    @property
-    def stage(self) -> str:
-        return "change_impact"
+    id = "change-impact"
+    name = "Change Impact Assessment & Interdependency Matrix"
+    purpose = "Assesses the impact of a proposed change across systems and workstreams, producing an interdependency matrix."
+    stage = StageEnum.DDL3
+    required_inputs = ["current_and_target_architecture"]
 
     async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
         text_input = input_data.get("normalized_input") or input_data.get("text") or ""
@@ -61,10 +60,10 @@ class ChangeImpactAgent(BaseAgent):
             '    }\n'
             '  ],\n'
             '  "operational_readiness_evaluation": {\n'
-            '    "readiness_score_pct": 82,\n'
-            '    "cutover_strategy": "Zero-downtime blue/green deployment",\n'
-            '    "rollback_protocol": "Instant DNS fallback",\n'
-            '    "hypercare_requirements": ["24/7 Monitoring for 14 days"]\n'
+            '    "readiness_score_pct": <integer 0-100 only if the input gives readiness evidence, else null>,\n'
+            '    "cutover_strategy": "<as stated in the input, else null>",\n'
+            '    "rollback_protocol": "<as stated in the input, else null>",\n'
+            '    "hypercare_requirements": ["<as stated in the input>"]\n'
             '  },\n'
             '  "interdependency_matrix": [\n'
             '    {\n'
@@ -77,7 +76,7 @@ class ChangeImpactAgent(BaseAgent):
             "}"
         )
 
-        impact_data = await call_llm(system, context_str, api_key=api_key, expected_type=dict)
+        impact_data = await call_llm(system + GROUNDING_RULES, context_str, api_key=api_key, expected_type=dict)
 
         if "cross_workstream_dependencies" not in impact_data:
             impact_data["cross_workstream_dependencies"] = []

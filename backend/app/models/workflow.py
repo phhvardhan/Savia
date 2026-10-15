@@ -54,7 +54,7 @@ class WorkflowSession(BaseModel):
     input_type: str = "unknown"
     outputs: Dict[str, Any] = Field(default_factory=lambda: {
         "mom": None,
-        "user_stories": None,
+        "agile_stories": None,
         "ddl3": None,
         "tests": None
     })

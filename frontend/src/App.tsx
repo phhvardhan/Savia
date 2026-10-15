@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { ScrollToContent } from './components/layout/ScrollToContent';
+import { RunTheme } from './components/layout/RunTheme';
 // AUTH DISABLED — see the block at the bottom of this file to restore it.
 // import { RequireAuth } from './auth/RequireAuth';
 // import { LoginPage } from './pages/LoginPage';
@@ -28,6 +29,7 @@ import { SuggestionsPage } from './pages/SuggestionsPage';
 import { StalePage } from './pages/StalePage';
 import { RefreshPlanPage } from './pages/RefreshPlanPage';
 import { ChainPage } from './pages/ChainPage';
+import { IntakePage } from './pages/IntakePage';
 import { MissingInfoPage } from './pages/MissingInfoPage';
 import { StudioPage } from './pages/StudioPage';
 import { WorkPage } from './pages/WorkPage';
@@ -37,10 +39,12 @@ function AppRoutes() {
   return (
     <AppShell>
       <ScrollToContent />
+      <RunTheme>
       <Routes>
         <Route path="/" element={<Navigate to="/work" replace />} />
         <Route path="/work" element={<HomePage />} />
         <Route path="/agents" element={<WorkPage />} />
+        <Route path="/intake" element={<IntakePage />} />
         <Route path="/reading" element={<ReadingPage />} />
         <Route path="/writing" element={<WritingPage />} />
         <Route path="/document" element={<DocumentPage />} />
@@ -68,6 +72,7 @@ function AppRoutes() {
         <Route path="/help" element={<HelpPage />} />
         <Route path="*" element={<Navigate to="/work" replace />} />
       </Routes>
+      </RunTheme>
     </AppShell>
   );
 }

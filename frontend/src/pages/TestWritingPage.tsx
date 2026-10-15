@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FanConnector } from '../components/ui/FanConnector';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -41,6 +43,9 @@ const PROGRESS = [
 
 export function TestWritingPage() {
   const navigate = useNavigate();
+  const gaveRef = useRef<HTMLDivElement>(null);
+  const hubRef = useRef<HTMLElement>(null);
+  const recommendsRef = useRef<HTMLUListElement>(null);
 
   return (
     <Section
@@ -60,7 +65,7 @@ export function TestWritingPage() {
           <p className={`${styles.columnLabel} ${styles.labelWorking}`}>TEST</p>
           <p className={`${styles.columnLabel} ${styles.labelRecommends}`}>What it will produce</p>
 
-          <div className={styles.gave}>
+          <div ref={gaveRef} className={styles.gave}>
             <article className={styles.inputCard}>
               <div className={styles.inputHead}>
                 <h3 className={styles.inputTitle}>Approved design v1</h3>
@@ -86,17 +91,16 @@ export function TestWritingPage() {
             </article>
           </div>
 
-          <svg
+          <FanConnector
             className={`${styles.connector} ${styles.connectorLeft}`}
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <path d="M0 25 C 45 25, 55 42, 100 42" fill="none" stroke="#C3C4C5" strokeWidth="0.7" />
-            <path d="M0 75 C 45 75, 55 55, 100 55" fill="none" stroke="#C3C4C5" strokeWidth="0.7" />
-          </svg>
+            cards={gaveRef}
+            cardSelector=":scope > article"
+            hub={hubRef}
+            hubSide="right"
+            deps={[]}
+          />
 
-          <section className={styles.orchestrator} aria-label="TEST progress">
+          <section ref={hubRef} className={styles.orchestrator} aria-label="TEST progress">
             <div className={styles.orchestratorHead}>
               <h3 className={styles.orchestratorName}>TEST</h3>
               <p className={styles.orchestratorState}>Criterion 5 of 6</p>
@@ -127,23 +131,17 @@ export function TestWritingPage() {
             ))}
           </section>
 
-          <svg
+          <FanConnector
             className={`${styles.connector} ${styles.connectorRight}`}
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <path d="M0 45 C 50 45, 50 25, 100 25" fill="none" stroke="#EB7D00" strokeWidth="0.9" />
-            <path
-              d="M0 55 C 50 55, 50 72, 100 72"
-              fill="none"
-              stroke="#C3C4C5"
-              strokeWidth="0.7"
-              strokeDasharray="3 3"
-            />
-          </svg>
+            cards={recommendsRef}
+            cardSelector=":scope > li"
+            hub={hubRef}
+            hubSide="left"
+            deps={[]}
+            line={(i) => (i === 0 ? { stroke: '#EB7D00', strokeWidth: 1.6 } : { strokeDasharray: '3 3' })}
+          />
 
-          <ul className={styles.recommends}>
+          <ul ref={recommendsRef} className={styles.recommends}>
             {OUTPUTS.map((item) => (
               <li key={item.id} className={styles.recommend}>
                 <div className={styles.outputHead}>

@@ -1,39 +1,14 @@
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
 import { StatGrid } from '../components/ui/StatGrid';
+import { AGENT_META, artifactExportUrl } from '../lib/savia';
+import { useAttachment } from '../state/attachment';
+import { resetOnce } from '../lib/once';
+import { useRun, useCurrentRun } from '../state/run';
 import styles from './PublishPage.module.css';
-
-const DESTINATIONS = [
-  {
-    id: 'confluence',
-    logo: 'C',
-    logoClass: styles.logoBlue,
-    title: 'CONFLUENCE · Design Specifications, Release 2.1',
-    titleClass: styles.titleBlue,
-    note: 'Publishes the approved version as a page, with the approval record attached and a link back to this workspace',
-    tone: 'blue' as const,
-  },
-  {
-    id: 'test',
-    logo: 'T',
-    logoClass: styles.logoRed,
-    title: 'TEST · The Next Agent',
-    titleClass: styles.titleRed,
-    note: 'Hands over the approved design and everything it carries criteria, decisions, personas, systems, so TEST can start without you retyping anything',
-    tone: 'red' as const,
-  },
-  {
-    id: 'jira',
-    logo: 'J',
-    logoClass: styles.logoBlue,
-    title: 'JIRA · JGFY-2812, JGFY-5303, JGFY-8052',
-    titleClass: styles.titleBlue,
-    note: 'Updates the three stories with a link to the approved design and moves them to Ready for Test',
-    tone: 'blue' as const,
-  },
-];
 
 const ALSO = [
   {
@@ -59,53 +34,83 @@ const ALSO = [
   },
 ];
 
-const OUTCOME = [
-  { value: '1', caption: 'page created', hint: 'Confluence · Release 2.1', tone: 'red' as const },
-  { value: '3', caption: 'Jira stories updated', hint: 'linked and moved to Ready for Test', tone: 'red' as const },
-  { value: '1', caption: 'agent started', hint: 'TEST, with the approved packet', tone: 'red' as const },
-  { value: '1 hour', caption: 'to roll any of it back', hint: 'one action, everything undone', tone: 'red' as const },
-];
-
 export function PublishPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { resetAll } = useRun();
+  const { setAttachment } = useAttachment();
+  const { agentId, run } = useCurrentRun();
+  const meta = agentId ? AGENT_META[agentId] : undefined;
+  const approvedBy = (location.state as { approvedBy?: string } | null)?.approvedBy;
+  const [published, setPublished] = useState(false);
+
+  // Screen 11 comes after the approval on screen 10, never before it.
+  if (!run || !meta || !approvedBy) {
+    return (
+      <Section id="publish" title="Approve it before you publish" size="compact">
+        <Card panel className={styles.panel}>
+          <div className={styles.actions}>
+            <Button variant="primary" onClick={() => navigate(run ? '/sharing' : '/work')}>
+              {run ? 'Go to the approval' : 'Start a run'}
+            </Button>
+          </div>
+        </Card>
+      </Section>
+    );
+  }
+
+  const destinations = [
+    {
+      id: 'confluence',
+      logo: 'C',
+      title: `CONFLUENCE · ${meta.full}`,
+      note: 'Not connected yet: publishing marks the run as published here. Share the Word file below until it is',
+    },
+    {
+      id: 'word',
+      logo: 'W',
+      title: 'WORD · download the approved version',
+      note: 'The J&J template is kept. This one works today: the file downloads straight away',
+    },
+  ];
+  const outcome = [
+    { value: `v${run.version}`, caption: 'version published', hint: 'the one that was approved', tone: 'red' as const },
+    { value: '1', caption: 'approval on the record', hint: approvedBy === 'You' ? 'yours' : `by the ${approvedBy}`, tone: 'red' as const },
+    { value: '0', caption: 'retyping', hint: 'the output goes as it is', tone: 'red' as const },
+  ];
 
   return (
     <Section
       id="publish"
-      title="Approved. Now send it where it belongs."
+      title={published ? 'Published. This run is complete.' : 'Approved. Now send it where it belongs.'}
       size="compact"
-      subtitle="Savia proposes the destinations that fit this artefact. Each one says exactly what will be created, and each one can be rolled back."
-      aside={<p className={styles.approvedPill}>Approved by D. Blanco</p>}
+      subtitle={`${meta.full} · version ${run.version}. Each destination says exactly what will be created.`}
+      aside={<p className={styles.approvedPill}>Approved by {approvedBy}</p>}
     >
       <Card panel className={styles.panel}>
         <div className={styles.block}>
-          <h2 className={styles.label}>Recommended do all three</h2>
+          <h2 className={styles.label}>Recommended</h2>
           <ul className={styles.destinations}>
-            {DESTINATIONS.map((item) => (
+            {destinations.map((item) => (
               <li key={item.id} className={styles.destination}>
-                <span className={`${styles.logo} ${item.logoClass}`} aria-hidden="true">
+                <span className={`${styles.logo} ${styles.logoRed}`} aria-hidden="true">
                   {item.logo}
                 </span>
                 <div className={styles.destinationText}>
-                  <h3 className={`${styles.destinationTitle} ${item.titleClass}`}>{item.title}</h3>
+                  <h3 className={`${styles.destinationTitle} ${styles.titleRed}`}>{item.title}</h3>
                   <p className={styles.destinationNote}>{item.note}</p>
                 </div>
                 <div className={styles.destinationEnd}>
-                  <span
-                    className={`${styles.recommended} ${
-                      item.tone === 'red' ? styles.recommendedRed : styles.recommendedBlue
-                    }`}
-                  >
-                    <span className={styles.recommendedDot} aria-hidden="true" />
-                    Recommended
-                  </span>
-                  <button
-                    type="button"
-                    aria-pressed="true"
-                    className={`${styles.toggle} ${item.tone === 'red' ? styles.toggleRed : styles.toggleBlue}`}
-                  >
-                    On
-                  </button>
+                  {item.id === 'word' ? (
+                    <Button small onClick={() => window.location.assign(artifactExportUrl(run.artifact_id, 'docx'))}>
+                      Download
+                    </Button>
+                  ) : (
+                    <span className={`${styles.recommended} ${styles.recommendedRed}`}>
+                      <span className={styles.recommendedDot} aria-hidden="true" />
+                      {published ? 'Published' : 'Recommended'}
+                    </span>
+                  )}
                 </div>
               </li>
             ))}
@@ -115,7 +120,7 @@ export function PublishPage() {
         <div className={`${styles.block} ${styles.divider}`}>
           <h2 className={styles.label}>Also available</h2>
           <ul className={styles.alsoGrid}>
-            {ALSO.map((item) => (
+            {ALSO.filter((item) => item.id !== 'word').map((item) => (
               <li key={item.id} className={styles.also}>
                 <div className={styles.alsoHead}>
                   <span className={`${styles.alsoLogo} ${item.logoClass}`} aria-hidden="true">
@@ -130,14 +135,28 @@ export function PublishPage() {
         </div>
 
         <div className={styles.statsBorder}>
-          <StatGrid label="What will happen when you press publish" labelTone="ink" stats={OUTCOME} />
+          <StatGrid label={published ? 'What was published' : 'What will happen when you press publish'} labelTone="ink" stats={outcome} />
         </div>
 
         <div className={styles.actions}>
-          <Button variant="primary" onClick={() => navigate('/handoff')}>
-            Publish and hand off
-          </Button>
-          <Button>Choose destinations</Button>
+          {published ? (
+            <Button
+              variant="primary"
+              onClick={() => {
+                resetAll();
+                setAttachment(null);
+                resetOnce();
+                navigate('/work');
+              }}
+            >
+              Start a new run
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => setPublished(true)}>
+              Publish and hand off
+            </Button>
+          )}
+          <Button onClick={() => navigate('/document')}>Back to the document</Button>
         </div>
       </Card>
     </Section>

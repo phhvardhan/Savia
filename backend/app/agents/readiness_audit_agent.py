@@ -1,23 +1,22 @@
 import json
 from typing import Dict, Any, Optional
 from app.agents.base import BaseAgent
+from app.models.workflow import StageEnum
 from app.core.agent import score_document_ai
 from app.utils.logger import logger
 
 
-class ReadinessScoringAgent(BaseAgent):
+class ReadinessAuditAgent(BaseAgent):
     """
     Delivery Readiness Scoring & SDLC Audit Agent.
     Evaluates completeness of deliverables, feasibility, security/GxP compliance,
     production readiness, hypercare preparedness, and SDLC process gaps.
     """
-    @property
-    def agent_name(self) -> str:
-        return "readiness-scoring"
-
-    @property
-    def stage(self) -> str:
-        return "audit"
+    id = "readiness-audit"
+    name = "Delivery Readiness Scoring & SDLC Audit"
+    purpose = "Scores a deliverable or spec for delivery readiness and SDLC/GxP audit compliance, with remediation points."
+    stage = StageEnum.COMPLETED
+    required_inputs = ["deliverables_or_spec"]
 
     async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
         text_input = input_data.get("normalized_input") or input_data.get("text") or ""
@@ -26,7 +25,7 @@ class ReadinessScoringAgent(BaseAgent):
         if not text_input.strip():
             raise ValueError("Input text cannot be empty for Delivery Readiness Scoring & SDLC Audit Agent.")
 
-        logger.info(f"[ReadinessScoringAgent] Auditing document length {len(text_input)} against rubric '{rubric}'...")
+        logger.info(f"[ReadinessAuditAgent] Auditing document length {len(text_input)} against rubric '{rubric}'...")
 
         # Re-use existing score_document_ai logic
         score_result = await score_document_ai(
@@ -134,4 +133,4 @@ class ReadinessScoringAgent(BaseAgent):
         }
 
 
-readiness_scoring_agent = ReadinessScoringAgent()
+readiness_audit_agent = ReadinessAuditAgent()

@@ -1,0 +1,30 @@
+Northwind Pharma - Stock Sync Working Session
+Date: 3 November 2026, 10:00-10:45 (Teams call)
+
+[00:00] Priya Shah (Supply Chain Lead): Thanks for joining. The goal today is to agree how we fix the stock mismatch between SAP S/4HANA and the Manhattan WMS. Planners at the Rotterdam distribution centre are still seeing wrong availability for up to a day.
+
+[01:10] Tom Becker (WMS Architect): The root cause is the nightly SFTP batch. The WMS writes one stock file at 23:00 and SAP picks it up at 02:00. Anything that moves during the day is invisible until the next morning.
+
+[02:30] Ken Morita (SAP Functional Consultant): We cannot modify the SAP core. Anything we build has to use standard interfaces, so BAPIs, IDocs or OData.
+
+[03:15] Aisha Rahman (QA Lead): And it has to stay GxP compliant. Every stock change needs an audit trail we can show an inspector.
+
+[05:40] Tom Becker: My proposal is that the WMS publishes a stock-movement event for every pick, putaway and adjustment, and SAP consumes those events through the integration layer.
+
+[07:05] Priya Shah: Any objections to moving from the nightly batch to event-based sync? ... None. Decision: we move to event-based stock sync.
+
+[08:20] Ken Morita: I'd rather not do all sites at once.
+
+[08:45] Priya Shah: Agreed. Decision: we pilot at the Rotterdam distribution centre only, and decide on the other sites after the pilot.
+
+[10:00] Priya Shah: Actions. Tom, can you design the event schema?
+[10:10] Tom Becker: Yes, I'll have the event schema ready by 14 November.
+[10:30] Priya Shah: Ken, please confirm which standard SAP interface we use for the stock postings.
+[10:40] Ken Morita: I'll confirm that by 10 November.
+[11:00] Priya Shah: Aisha, please draft the UAT plan for the pilot.
+[11:10] Aisha Rahman: Will do. I can't commit to a date until I know the pilot scope.
+
+[12:30] Aisha Rahman: One thing nobody has answered: who owns the daily reconciliation report once the batch is gone? Finance or supply chain?
+[12:50] Priya Shah: Good question, we don't know yet. Let's leave it open and take it to the steering committee.
+
+[13:30] Priya Shah: Thanks all. No budget was discussed today; that comes after the pilot design.
