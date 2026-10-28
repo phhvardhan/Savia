@@ -38,9 +38,11 @@ export function RunProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startAgentRun = useCallback(
-    (agentId: string) => {
-      if (!upload) return;
-      const key = `${agentId}:${upload.workflow_id}`;
+    (agentId: string, input?: UploadResult, sourceArtifactId?: string) => {
+      // `input` is for a hand-off: setRun has not rendered yet, so the new document is passed in directly.
+      const source = input ?? upload;
+      if (!source) return;
+      const key = `${agentId}:${source.workflow_id}`;
 
       // Already produced for this document — show it rather than pay again.
       const startedAt = Date.now();
@@ -53,8 +55,10 @@ export function RunProvider({ children }: { children: ReactNode }) {
       setActiveRun({ key, agent: agentId, startedAt, status: 'running', run: null, error: null });
 
       runAgent(agentId, {
-        workflow_id: upload.workflow_id,
-        input_text: upload.full_normalized_text,
+        workflow_id: source.workflow_id,
+        input_text: source.full_normalized_text,
+        // A hand-off: the server builds the input from that output and checks the agent may take it.
+        ...(sourceArtifactId ? { source_artifact_id: sourceArtifactId } : {}),
       })
         .then((run) => {
           setAgentRuns((current) => ({ ...current, [key]: run }));

@@ -142,3 +142,44 @@
   .alsoGrid { grid-template-columns: minmax(0, 1fr); }
   .actions { flex-direction: column; padding: 22px 18px 26px; }
 }
+
+/* Platform logos and links ------------------------------------------------- */
+.logoLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 10px;
+  background: #FFFFFF;
+  border: 1px solid var(--line);
+}
+.logoImg { width: 30px; height: 30px; object-fit: contain; }
+.destinationNext { border-color: var(--brand-red); }
+.toggleOff { background: #D9D9D9; color: #595959; }
+.openLink { font-size: 13px; font-weight: 600; color: #005EEB; text-decoration: none; white-space: nowrap; }
+.openLink:hover { text-decoration: underline; }
+.footnote { margin-top: 14px; font-size: 13px; line-height: 150%; color: var(--text-muted); }
+
+.alsoHead { justify-content: space-between; }
+.alsoLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.alsoLink:hover .alsoTitle { text-decoration: underline; }
+.alsoLogoImg { width: 30px; height: 30px; flex: none; object-fit: contain; }
+
+.iteration { border-top: 1px solid var(--line-soft); background: var(--red-tint); }
+.iterationText { font-size: 15px; line-height: 150%; color: var(--text-primary); }
+
+.pills { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.pillWarn { background: #FFF3E0; color: #B25E00; }

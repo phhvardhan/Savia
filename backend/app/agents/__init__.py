@@ -9,7 +9,6 @@ from app.agents.change_impact_agent import change_impact_agent
 from app.agents.test_agent import test_agent
 from app.agents.readiness_audit_agent import readiness_audit_agent
 
-# Every agent, in the order the UI and recommender list them. Add new agents here.
 AGENTS = [
     mom_agent,
     agile_stories_agent,

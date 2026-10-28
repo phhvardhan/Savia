@@ -1,7 +1,8 @@
-from typing import Dict, Any, Optional
+from typing import Any, Dict
+
 from app.agents.base import BaseAgent
+from app.agents.schemas import SolutionOutput
 from app.models.workflow import StageEnum
-from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
 
 
@@ -32,25 +33,19 @@ SYSTEM = (
 
 
 class SolutionAnalyzerAgent(BaseAgent):
-    """Solution Analyzer: proposes a solution blueprint for the problem in the input."""
-
     id = "solution-analyzer"
     name = "Solution Analyzer & Blueprint"
     purpose = "Takes a problem statement or discovery input and proposes a solution blueprint: approach, components, integrations, risks and a phased roadmap."
     stage = StageEnum.REQUIREMENTS
     required_inputs = ["problem_statement"]
+    output_model = SolutionOutput
 
-    async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
-        text = self.source_text(input_data)
-        if not text.strip():
+    async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.source_text(input_data).strip():
             raise ValueError("Input text cannot be empty for the Solution Analyzer Agent.")
-
-        logger.info(f"[SolutionAnalyzerAgent] Designing a solution from input length {len(text)}...")
-        result = await call_llm(SYSTEM, f"PROBLEM INPUT:\n{fit_text(text, 8000)}", api_key=api_key, expected_type=dict)
-
-        for key in ("components", "integrations", "alternatives", "risks", "roadmap", "needs_info", "constraints"):
-            result.setdefault(key, [])
-        return result
+        source = await self.source(input_data)
+        logger.info(f"[SolutionAnalyzerAgent] Designing a solution from {len(source)} chars")
+        return await self.generate(SYSTEM, f"PROBLEM INPUT:\n{source}")
 
 
 solution_analyzer_agent = SolutionAnalyzerAgent()

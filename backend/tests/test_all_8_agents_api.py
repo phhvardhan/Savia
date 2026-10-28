@@ -1,73 +1,62 @@
 import pytest
-from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
 
-SAMPLE_TEXT = "Enterprise software requirements and architecture specification for order fulfillment and inventory management."
+SAMPLE_TEXT = "REQ-001 Orders must be routed to the nearest warehouse. REQ-002 Stock is checked before routing."
 
-MOCK_MOM = {"summary": "Meeting notes summary", "decisions": ["Approved"], "action_items": ["Action 1"], "key_points": ["Point 1"], "requirements_identified": ["Req 1"], "open_questions": []}
-MOCK_STORIES = {"epics": ["Fulfillment"], "user_stories": [{"user_story_id": "US-001", "title": "Order Placement", "as_a": "user", "i_want": "place order", "so_that": "item is delivered", "acceptance_criteria": []}]}
-MOCK_DDL3 = {"design_id": "DES-001", "document_type": "functional_design", "title": "Fulfillment Spec", "purpose": "Order routing"}
-MOCK_TEST = {"test_inventory": [], "test_cases": [{"test_case_id": "TC-001", "title": "Place Order", "status": "Not Executed"}], "test_plan": {}}
-MOCK_SCORE = {"overallScore": 85, "grade": "85/100", "dimensions": []}
-MOCK_GAP = {"title": "Gap Analysis", "traceability_matrix": []}
-MOCK_IMPACT = {"title": "Change Impact", "cross_platform_impact_analysis": {}}
-MOCK_KDD = {"title": "KDD Package", "dab_submission_id": "DAB-001"}
+MOM = {"discussion_summary": "Routing review", "attendees": [], "key_points": [], "requirements_identified": [],
+       "decisions_finalized": ["Route by distance"], "action_items": [], "open_questions": []}
+STORIES = {"epics": ["Fulfilment"], "user_stories": [{"user_story_id": "US-001", "title": "Route orders",
+           "requirement_ids": ["REQ-001"], "acceptance_criteria": []}]}
+SOLUTION = {"title": "Blueprint", "components": [{"name": "Router"}]}
+GAP = {"title": "Gaps", "traceability_matrix": [{"req_id": "REQ-001"}], "gap_classification": []}
+DDL3 = {"title": "Routing design", "functional_flow": [{"title": "Receive order", "description": "..."}]}
+KDD = {"title": "KDD", "decision_making_framework": []}
+IMPACT = {"title": "Impact", "cross_workstream_dependencies": [], "interdependency_matrix": []}
+TEST = {"test_cases": [{"title": "Route to nearest", "test_steps": ["Place order"], "requirement_id": "REQ-001"}]}
+AUDIT = {
+    "dimensions": [{"name": "Completeness & Scope", "score": 70, "weight": 50},
+                   {"name": "GxP / Regulatory Audit", "score": 90, "weight": 50}],
+    "sdlc_score_justification": {"overall_summary": "Reasonable",
+                                 "sdlc_stage_breakdown": [{"sdlc_stage": "1. Requirements", "justification": "IDs present"}]},
+}
 
-
-def test_api_01_mom_agent():
-    with patch("app.agents.mom_agent.generate_mom", new_callable=AsyncMock, return_value=MOCK_MOM):
-        res = client.post("/api/v1/agents/mom", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
-        assert res.status_code == 200
-        assert res.json()["agent_name"] == "mom"
-
-
-def test_api_02_user_stories_agent():
-    with patch("app.agents.agile_stories_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_STORIES):
-        res = client.post("/api/v1/agents/agile-stories", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
-        assert res.status_code == 200
-        assert res.json()["agent_name"] == "agile-stories"
-
-
-def test_api_03_ddl3_agent():
-    with patch("app.agents.ddl3_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_DDL3):
-        res = client.post("/api/v1/agents/ddl3", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
-        assert res.status_code == 200
-        assert res.json()["agent_name"] == "ddl3"
-
-
-def test_api_04_test_agent():
-    with patch("app.agents.test_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_TEST):
-        res = client.post("/api/v1/agents/test", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
-        assert res.status_code == 200
-        assert res.json()["agent_name"] == "test"
+CASES = [
+    ("mom", MOM, "decisions_finalized"),
+    ("agile-stories", STORIES, "user_stories"),
+    ("solution-analyzer", SOLUTION, "components"),
+    ("gap-analysis", GAP, "traceability_matrix"),
+    ("ddl3", DDL3, "functional_flow"),
+    ("kdd-dab", KDD, "decision_making_framework"),
+    ("change-impact", IMPACT, "interdependency_matrix"),
+    ("test", TEST, "test_cases"),
+    ("readiness-audit", AUDIT, "dimensions"),
+]
 
 
-def test_api_05_readiness_audit_agent():
-    with patch("app.agents.readiness_audit_agent.score_document_ai", new_callable=AsyncMock, return_value=MOCK_SCORE):
-        res = client.post("/api/v1/agents/readiness-audit", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
-        assert res.status_code == 200
-        assert res.json()["agent_name"] == "readiness-audit"
+@pytest.mark.parametrize("agent_id, reply, key", CASES)
+def test_every_agent_runs_through_the_api(fake_llm, agent_id, reply, key):
+    fake_llm.reply(reply)
+    res = client.post(f"/api/v1/agents/{agent_id}", json={"input_text": SAMPLE_TEXT})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["agent_name"] == agent_id
+    assert key in body["content"]
+    assert body["approval_status"] == "pending"
+    assert body["quality"]["checked"] is True
 
 
-def test_api_06_gap_analysis_agent():
-    with patch("app.agents.gap_analysis_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_GAP):
-        res = client.post("/api/v1/agents/gap-analysis", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
-        assert res.status_code == 200
-        assert res.json()["agent_name"] == "gap-analysis"
+def test_readiness_score_is_computed_from_dimensions(fake_llm):
+    fake_llm.reply(AUDIT)
+    content = client.post("/api/v1/agents/readiness-audit", json={"input_text": SAMPLE_TEXT}).json()["content"]
+    assert content["overall_score"] == 80
+    assert content["grade"].startswith("80/100")
 
 
-def test_api_07_change_impact_agent():
-    with patch("app.agents.change_impact_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_IMPACT):
-        res = client.post("/api/v1/agents/change-impact", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
-        assert res.status_code == 200
-        assert res.json()["agent_name"] == "change-impact"
-
-
-def test_api_08_kdd_dab_agent():
-    with patch("app.agents.kdd_dab_agent.call_llm", new_callable=AsyncMock, return_value=MOCK_KDD):
-        res = client.post("/api/v1/agents/kdd-dab", json={"input_text": SAMPLE_TEXT, "bypass_approval": True})
-        assert res.status_code == 200
-        assert res.json()["agent_name"] == "kdd-dab"
+def test_audit_without_dimensions_is_rejected_not_invented(fake_llm):
+    fake_llm.reply({"dimensions": [], "sdlc_score_justification": {"overall_summary": "x", "sdlc_stage_breakdown": []}})
+    res = client.post("/api/v1/agents/readiness-audit", json={"input_text": SAMPLE_TEXT})
+    assert res.status_code == 502

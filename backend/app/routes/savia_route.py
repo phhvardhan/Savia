@@ -9,11 +9,6 @@ router = APIRouter()
 
 @router.post("/recommend", response_model=RecommendationResponse, tags=["SAVIA Layer / SAVIA Recommendation"])
 async def savia_recommend_agent(payload: RecommendationRequest):
-    """
-    SAVIA Recommendation Layer:
-    Analyzes raw user input (text, PDF snippet, transcript, or document content) and current SDLC stage
-    to recommend the optimal downstream modular agent (MOM, Agile User Story, DDL3, or Test Agent).
-    """
     session = None
     if payload.workflow_id:
         session = workflow_engine.get_workflow(payload.workflow_id)
@@ -46,9 +41,6 @@ async def savia_recommend_agent(payload: RecommendationRequest):
 
 @router.post("/orchestrate", tags=["SAVIA Layer / SAVIA Recommendation"])
 async def savia_orchestrate(payload: dict):
-    """
-    High-level SAVIA orchestration entrypoint for analyzing and organizing complete workflow pipeline requests.
-    """
     workflow_id = payload.get("workflow_id")
     session = workflow_engine.get_workflow(workflow_id) if workflow_id else None
     
@@ -65,7 +57,7 @@ async def savia_orchestrate(payload: dict):
     rec = await savia_orchestrator.recommend(session, raw_text, input_type)
 
     return {
-        "workflow": session.dict(),
+        "workflow": session.model_dump(),
         "recommendation": rec,
         "status": "orchestrated"
     }

@@ -136,6 +136,39 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return payload as T;
 }
 
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { headers });
+  } catch {
+    throw new ApiError('Could not reach the SAVIA server. Is the backend running?', 0);
+  }
+  if (!res.ok) {
+    let detail = `Download failed (${res.status}).`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === 'string') detail = body.detail;
+    } catch {
+      /* keep the generic message */
+    }
+    throw new ApiError(detail, res.status);
+  }
+
+  const match = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '');
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = match?.[1] ?? fallbackName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * Multipart POST for file ingestion. Kept separate from `request` because the
  * browser must set its own Content-Type so the multipart boundary is correct.

@@ -1,173 +1,99 @@
-import ssl
 import os
-from datetime import datetime, timedelta
+import ssl
 
-from ldap3 import Server, Connection, Tls, ALL, SUBTREE
-from ldap3.core.exceptions import LDAPBindError, LDAPSocketOpenError, LDAPException
-from jose import jwt, JWTError
+from ldap3 import ALL, SUBTREE, Connection, Server, Tls
+from ldap3.core.exceptions import LDAPBindError, LDAPSocketOpenError
+from ldap3.utils.conv import escape_filter_chars
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.utils.logger import logger
 
+AD_REASONS = {
+    "data 52e": "Invalid credentials.",
+    "data 532": "Password has expired.",
+    "data 533": "Account is disabled.",
+    "data 701": "Account has expired.",
+    "data 773": "Password must be changed before first use.",
+    "data 775": "Account is locked out.",
+}
 
-def _get_tls_config() -> Tls:
-    if not os.path.exists(settings.LDAP_CA_CERT_FILE):
-        print(f"[LDAP CHECKPOINT] Certificate file not found at {settings.LDAP_CA_CERT_FILE}")
+
+class DirectoryUnavailable(Exception):
+    pass
+
+
+def _server() -> Server:
+    ca_file = settings.LDAP_CA_CERT_FILE
+    if not os.path.exists(ca_file):
+        raise DirectoryUnavailable(f"LDAP CA certificate not found at {ca_file}.")
     tls_version = getattr(ssl, f"PROTOCOL_{settings.LDAP_TLS_VERSION}", ssl.PROTOCOL_TLS_CLIENT)
-    return Tls(
-        ca_certs_file=settings.LDAP_CA_CERT_FILE if os.path.exists(settings.LDAP_CA_CERT_FILE) else None,
-        validate=ssl.CERT_NONE if not os.path.exists(settings.LDAP_CA_CERT_FILE) else ssl.CERT_REQUIRED,
-        version=tls_version,
-    )
-
-
-def _get_server() -> Server:
-    tls = _get_tls_config()
-    return Server(
-        settings.LDAP_SERVER,
-        port=settings.LDAP_PORT,
-        use_ssl=True,
-        tls=tls,
-        get_info=ALL,
-        connect_timeout=2
-    )
-
-
-def _service_connection() -> Connection:
-    """Binds as the shared JNJ service account - only used to LOOK UP a user's DN."""
-    server = _get_server()
-    try:
-        return Connection(
-            server,
-            user=settings.LDAP_SERVICE_USER,
-            password=settings.LDAP_SERVICE_PASSWORD,
-            auto_bind=True,
-        )
-    except LDAPBindError as e:
-        raise ValueError(f"Service account bind failed: {e}")
-    except LDAPSocketOpenError as e:
-        raise ValueError(f"Could not reach LDAP server {settings.LDAP_SERVER}:{settings.LDAP_PORT}: {e}")
-    except Exception as e:
-        raise ValueError(f"LDAP connection error: {e}")
+    tls = Tls(ca_certs_file=ca_file, validate=ssl.CERT_REQUIRED, version=tls_version)
+    return Server(settings.LDAP_SERVER, port=settings.LDAP_PORT, use_ssl=True, tls=tls, get_info=ALL, connect_timeout=5)
 
 
 def _find_user_entry(identifier: str):
-    """Searches BASE_DN for the user, matching sAMAccountName OR mail."""
-    conn = _service_connection()
+    server = _server()
     try:
+        conn = Connection(server, user=settings.LDAP_SERVICE_USER, password=settings.LDAP_SERVICE_PASSWORD, auto_bind=True)
+    except LDAPSocketOpenError as e:
+        raise DirectoryUnavailable(f"Could not reach {settings.LDAP_SERVER}:{settings.LDAP_PORT}: {e}")
+    except LDAPBindError as e:
+        raise DirectoryUnavailable(f"Service account bind failed: {e}")
+    try:
+        safe = escape_filter_chars(identifier)
         conn.search(
             search_base=settings.LDAP_BASE_DN,
-            search_filter=f"(&(objectClass=user)(|(sAMAccountName={identifier})(mail={identifier})))",
+            search_filter=f"(&(objectClass=user)(|(sAMAccountName={safe})(mail={safe})))",
             search_scope=SUBTREE,
             attributes=["distinguishedName", "displayName", "mail", "memberOf"],
         )
         if not conn.entries:
-            raise ValueError(f"No LDAP user found for '{identifier}'.")
-        return conn.entries[0]
+            raise ValueError("Invalid credentials.")
+        return conn.entries[0], server
     finally:
-        if hasattr(conn, "unbind"):
-            conn.unbind()
+        conn.unbind()
 
 
-def _extract_ad_groups(user_entry) -> list[str]:
-    """Pulls memberOf DNs and extracts just the CN (group name) from each."""
-    groups = []
-    if hasattr(user_entry, "memberOf"):
-        for group_dn in user_entry.memberOf:
-            cn_part = group_dn.split(",")[0].replace("CN=", "")
-            groups.append(cn_part)
-    return groups
+def _groups(user_entry) -> list[str]:
+    if not hasattr(user_entry, "memberOf"):
+        return []
+    return [dn.split(",")[0].replace("CN=", "") for dn in user_entry.memberOf]
+
+
+def _allowed(identifier: str) -> bool:
+    allowed = settings.ALLOWED_USERS
+    return not allowed or identifier.lower() in allowed
+
+
+def _bind(identifier: str, password: str) -> dict:
+    user_entry, server = _find_user_entry(identifier)
+    conn = Connection(server, user=user_entry.entry_dn, password=password, authentication="SIMPLE")
+    if not conn.bind():
+        message = conn.result.get("message", "")
+        reason = next((r for code, r in AD_REASONS.items() if code in message), "Invalid credentials.")
+        raise ValueError(reason)
+    conn.unbind()
+    return {
+        "identifier": identifier,
+        "dn": user_entry.entry_dn,
+        "display_name": user_entry.displayName.value if hasattr(user_entry, "displayName") else identifier,
+        "email": user_entry.mail.value if hasattr(user_entry, "mail") and user_entry.mail else None,
+        "ad_groups": _groups(user_entry),
+    }
 
 
 async def authenticate_user(identifier: str, password: str) -> dict:
     identifier = (identifier or "").strip()
-    if not identifier:
-        raise ValueError("Username is required.")
-    if not password:
-        raise ValueError("Password is required.")
-
-    # 1. Attempt Corporate LDAP AD Authentication
+    if not identifier or not password:
+        raise ValueError("Username and password are required.")
+    if not _allowed(identifier):
+        raise ValueError("This account is not allowed to use SAVIA.")
     try:
-        user_entry = _find_user_entry(identifier)
-        user_dn = user_entry.entry_dn
-
-        server = _get_server()
-        user_conn = Connection(server, user=user_dn, password=password, authentication="SIMPLE")
-        bind_success = user_conn.bind()
-        print(f"[LDAP CHECKPOINT] bind() returned: {bind_success}, result: {user_conn.result}")
-
-        if not bind_success:
-            message = user_conn.result.get("message", "")
-            if "data 52e" in message:
-                reason = "Invalid credentials (password is incorrect)."
-            elif "data 532" in message:
-                reason = "Password has EXPIRED."
-            elif "data 533" in message:
-                reason = "Account is DISABLED."
-            elif "data 701" in message:
-                reason = "Account has EXPIRED."
-            elif "data 773" in message:
-                reason = "Password must be changed / reset before first use."
-            elif "data 775" in message:
-                reason = "Account is LOCKED OUT."
-            else:
-                reason = f"AD error: {message}"
-            raise ValueError(f"LDAP bind failed: {reason}")
-
-        user_conn.unbind()
-
-        display_name = user_entry.displayName.value if hasattr(user_entry, "displayName") else identifier
-        email = user_entry.mail.value if hasattr(user_entry, "mail") and user_entry.mail else None
-        ad_groups = _extract_ad_groups(user_entry)
-
-        return {
-            "identifier": identifier,
-            "dn": user_dn,
-            "display_name": display_name,
-            "email": email,
-            "ad_groups": ad_groups,
-        }
-
-    except Exception as ldap_err:
-        err_msg = str(ldap_err).lower()
-        is_conn_error = any(term in err_msg for term in ["reach ldap", "socket", "getaddrinfo", "network", "timed out", "connection", "errno 11001", "service account bind failed"])
-        
-        allowed = [u.lower() for u in settings.ALLOWED_USERS]
-        id_lower = identifier.lower()
-        id_email = f"{id_lower}@its.jnj.com"
-
-        if is_conn_error and (id_lower in allowed or id_email in allowed or id_lower == "apancha3"):
-            print(f"[LDAP Fallback] Corporate LDAP server unreachable ({ldap_err}). Authenticating authorized user '{identifier}'.")
-            return {
-                "identifier": identifier,
-                "dn": f"CN={identifier},OU=Enterprise,DC=jnj,DC=com",
-                "display_name": identifier,
-                "email": f"{identifier}@ITS.JNJ.com" if "@" not in identifier else identifier,
-                "ad_groups": ["ITS-APP-ODAllowProvisioning-AP", "CBT-PR-Automatius-JJLearn-APP-Employee"],
-            }
-
-        # A raw socket traceback is not a sign-in message. Say which of the two
-        # things went wrong: the directory is unreachable, or the password is bad.
-        if is_conn_error:
-            logger.warning(f"[LDAP] Directory unreachable for '{identifier}': {ldap_err}")
-            raise ValueError(
-                "Cannot reach the J&J directory from this network, and "
-                f"'{identifier}' is not on the local development allowlist. "
-                "Add the username to ALLOWED_USERS in backend/.env to sign in offline."
-            )
-
-        raise ValueError(f"LDAP authentication failed: {ldap_err}")
-
-
-def create_access_token(data: dict) -> str:
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.SECRET_KEY, settings.ALGORITHM)
-
-
-def decode_access_token(token: str) -> dict:
-    try:
-        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-    except JWTError:
-        raise ValueError("Invalid or expired token.")
+        return await run_in_threadpool(_bind, identifier, password)
+    except DirectoryUnavailable as e:
+        if settings.ALLOW_OFFLINE_LOGIN and settings.ALLOWED_USERS and _allowed(identifier):
+            logger.warning(f"[LDAP] Directory unavailable ({e}); offline login for allowlisted '{identifier}'.")
+            return {"identifier": identifier, "dn": "", "display_name": identifier, "email": None, "ad_groups": []}
+        logger.warning(f"[LDAP] Directory unavailable: {e}")
+        raise ValueError("Cannot reach the corporate directory from this network.")

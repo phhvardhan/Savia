@@ -1,18 +1,31 @@
-from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, Response, status
-from app.core.export import artifact_to_docx, artifact_to_xlsx
-from app.orchestration.orchestrator import ALL_AGENTS
-from app.core.agent import call_llm, fit_text
-from pydantic import BaseModel
 import json
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+from app.core.export import artifact_to_xlsx
+from app.brand import fonts as brand_fonts
+from app.brand import jnj_tokens as brand_tokens
+from app.brand.adapter import to_brand_document
+from app.brand.renderer_docx import render_artifact_docx, render_docx_bytes, resolved_styles
+from app.brand.validator import BrandViolation
+from app.core.deck import solution_to_pptx
+from app.agents import AGENT_MAP
+from app.core.llm import call_llm
+from app.core.quality import assess
+from app.core.security import get_current_user
+from app.core.text import fit_text
+from app.models.workflow import ApprovalStatus, Artifact, StageEnum
+from app.orchestration.handoff import next_agent
+from app.orchestration.runner import artifact_response
+from app.orchestration.stage_manager import GateError, stage_manager
 from app.orchestration.workflow_engine import workflow_engine
-from app.orchestration.stage_manager import stage_manager
-from app.schemas.workflow_schema import (
-    WorkflowCreateRequest, ApproveStageRequest, AdvanceStageRequest
-)
-from app.models.workflow import StageEnum, WorkflowSession, Artifact
+from app.schemas.workflow_schema import AdvanceStageRequest, ApproveStageRequest, WorkflowCreateRequest
 
 router = APIRouter()
+fonts_router = APIRouter()
 
 
 @router.post("", tags=["Workflows"])
@@ -28,6 +41,10 @@ async def create_workflow(payload: WorkflowCreateRequest):
 
 @router.get("/{workflow_id}", tags=["Workflows"])
 async def get_workflow(workflow_id: str):
+    return _workflow(workflow_id)
+
+
+def _workflow(workflow_id: str):
     session = workflow_engine.get_workflow(workflow_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Workflow '{workflow_id}' not found.")
@@ -35,49 +52,65 @@ async def get_workflow(workflow_id: str):
 
 
 @router.post("/{workflow_id}/approve", tags=["Workflows"])
-async def approve_stage(workflow_id: str, payload: ApproveStageRequest):
-    session = workflow_engine.get_workflow(workflow_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Workflow '{workflow_id}' not found.")
-
-    updated_session = stage_manager.approve_stage(
-        session=session,
-        stage=session.current_stage,
-        user_id=payload.user_id,
-        comments=payload.comments
-    )
+async def approve_output(workflow_id: str, payload: ApproveStageRequest, user=Depends(get_current_user)):
+    session = _workflow(workflow_id)
+    if payload.artifact_id:
+        artifact = workflow_engine.get_artifact(payload.artifact_id)
+    else:
+        pending = stage_manager.pending_artifacts(session)
+        artifact = max(pending, key=lambda a: a.created_at) if pending else None
+    try:
+        decision = ApprovalStatus(payload.decision)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="decision must be 'approved' or 'rejected'.")
+    if decision not in (ApprovalStatus.APPROVED, ApprovalStatus.REJECTED):
+        raise HTTPException(status_code=400, detail="decision must be 'approved' or 'rejected'.")
+    approver = user.username if user.id != "usr-local" else (payload.user_id or user.username)
+    try:
+        artifact = stage_manager.approve(session, artifact, approver, payload.comments, decision)
+    except GateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    updated = workflow_engine.get_workflow(workflow_id)
     return {
-        "status": "approved",
-        "stage": session.current_stage.value,
-        "workflow": updated_session
+        "status": decision.value,
+        "stage": artifact.stage.value,
+        "artifact_id": artifact.artifact_id,
+        "version": artifact.version,
+        "workflow": updated,
     }
 
 
 @router.post("/{workflow_id}/advance", tags=["Workflows"])
 async def advance_stage(workflow_id: str, payload: AdvanceStageRequest):
-    session = workflow_engine.get_workflow(workflow_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Workflow '{workflow_id}' not found.")
-
+    session = _workflow(workflow_id)
     try:
         target_stage = StageEnum(payload.target_stage)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid target stage '{payload.target_stage}'. Valid stages: {[s.value for s in StageEnum]}")
+    try:
+        stage_manager.move_to(session, target_stage, require_approved=True)
+    except GateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    updated = workflow_engine.update_workflow(session)
+    return {"status": "advanced", "current_stage": updated.current_stage.value, "workflow": updated}
 
-    success, reason, updated = stage_manager.advance_stage(
-        session=session,
-        target_stage=target_stage,
-        bypass_approval=payload.bypass_approval
-    )
 
-    if not success:
-        raise HTTPException(status_code=400, detail=reason)
+class NextAgentRequest(BaseModel):
+    artifact_id: str | None = None
 
-    return {
-        "status": "advanced",
-        "current_stage": updated.current_stage.value,
-        "workflow": updated
-    }
+
+@router.post("/{workflow_id}/next-agent", tags=["Workflows"])
+async def route_next_agent(workflow_id: str, payload: NextAgentRequest):
+    """Orchestration: reads a generated output and names the agent that should take it next."""
+    session = _workflow(workflow_id)
+    if payload.artifact_id:
+        artifact = workflow_engine.get_artifact(payload.artifact_id)
+    else:
+        artifacts = workflow_engine.get_workflow_artifacts(workflow_id)
+        artifact = max(artifacts, key=lambda a: a.created_at) if artifacts else None
+    if not artifact or artifact.workflow_id != workflow_id:
+        raise HTTPException(status_code=404, detail="No generated output in this workflow to hand over.")
+    return await next_agent(session, artifact)
 
 
 @router.get("/{workflow_id}/artifacts", tags=["Artifacts"])
@@ -94,43 +127,79 @@ async def get_artifact(artifact_id: str):
     return artifact
 
 
-AGENT_NAMES = {aid: name for aid, name, _ in ALL_AGENTS}
+AGENT_NAMES = {aid: agent.name for aid, agent in AGENT_MAP.items()}
 
 EXPORT_TYPES = {
-    "docx": (artifact_to_docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    "docx": (render_artifact_docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     "xlsx": (artifact_to_xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
 }
 
 
 @router.get("/artifacts/{artifact_id}/export.{fmt}", tags=["Artifacts"])
 async def export_artifact(artifact_id: str, fmt: str):
-    """Download an agent's output as a styled Word document or Excel workbook."""
-    if fmt not in EXPORT_TYPES:
-        raise HTTPException(status_code=400, detail="Format must be docx or xlsx.")
+    if fmt not in EXPORT_TYPES and fmt != "pptx":
+        raise HTTPException(status_code=400, detail="Format must be docx, xlsx or pptx.")
     artifact = workflow_engine.get_artifact(artifact_id)
     if not artifact:
         raise HTTPException(status_code=404, detail=f"Artifact '{artifact_id}' not found.")
+    agent_name = AGENT_NAMES.get(artifact.agent_name, artifact.agent_name)
+
+    if fmt == "pptx":
+        if artifact.agent_name != "solution-analyzer":
+            raise HTTPException(status_code=400, detail="PowerPoint export is only available for the Solution Analyzer.")
+        subtitle = f"Prepared with SAVIA · {agent_name} · version {artifact.version}"
+        try:
+            data = solution_to_pptx(artifact.content, subtitle)
+        except BrandViolation as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        filename = f"savia-solution-blueprint-v{artifact.version}.pptx"
+        return Response(data, media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
     build, media_type = EXPORT_TYPES[fmt]
-    agent_name = AGENT_NAMES.get(artifact.agent_name, artifact.agent_name)
-    title = str(artifact.content.get("title") or agent_name)
-    subtitle = f"Generated by SAVIA · {agent_name} · version {artifact.version} · {artifact.created_at[:10]}"
+    title, subtitle = _document_titles(artifact, agent_name)
     try:
         data = build(title, subtitle, artifact.content)
-    except ValueError as e:  # e.g. nothing tabular to put in Excel
+    except BrandViolation as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
     filename = f"savia-{artifact.agent_name}-v{artifact.version}.{fmt}"
     return Response(data, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+def _document_titles(artifact, agent_name: str) -> tuple[str, str]:
+    title = str(artifact.content.get("title") or agent_name)
+    subtitle = f"Generated by SAVIA · {agent_name} · version {artifact.version} · {artifact.created_at[:10]}"
+    return title, subtitle
 
-# ---------------------------------------------------------------------------
-# Editing an agent's output: AI-suggested section edits (grounded in the
-# workflow's source input), applying them as a new artifact version, and
-# finding decisions the document leaves open.
-# ---------------------------------------------------------------------------
-SOURCE_CHARS = 8000
+
+@router.get("/artifacts/{artifact_id}/brand-document", tags=["Artifacts"])
+async def brand_document(artifact_id: str):
+    artifact = workflow_engine.get_artifact(artifact_id)
+    if not artifact:
+        raise HTTPException(status_code=404, detail=f"Artifact '{artifact_id}' not found.")
+    doc = to_brand_document(*_document_titles(artifact, AGENT_NAMES.get(artifact.agent_name, artifact.agent_name)),
+                            artifact.content)
+    try:
+        render_docx_bytes(doc)
+    except BrandViolation as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"document": doc.model_dump(), "styles": resolved_styles(), "fonts": brand_fonts.font_faces(),
+            "page_background": brand_tokens.hex_for(brand_tokens.PAGE_BACKGROUND),
+            "rule_color": brand_tokens.hex_for(brand_tokens.RULE_COLOR)}
+
+
+@fonts_router.get("/brand/fonts/{filename}", tags=["Artifacts"])
+async def brand_font(filename: str):
+    match = next((p for p in brand_fonts.font_files() if p.name == filename), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Font not found.")
+    return FileResponse(match)
+
+
+SOURCE_CHARS = 24000
 
 
 def _artifact_and_source(artifact_id: str):
@@ -140,6 +209,26 @@ def _artifact_and_source(artifact_id: str):
     session = workflow_engine.get_workflow(artifact.workflow_id)
     source = (session.normalized_input if session else "") or ""
     return artifact, fit_text(source, SOURCE_CHARS)
+
+
+def _revise(artifact: Artifact, content: Dict[str, Any], event: str) -> Dict[str, Any]:
+    session = workflow_engine.get_workflow(artifact.workflow_id)
+    source = session.normalized_input if session else ""
+    upstream = {
+        a.agent_name: a.content
+        for a in (workflow_engine.get_artifact(i) for i in artifact.traceability.upstream_artifact_ids)
+        if a
+    }
+    revised = workflow_engine.save_artifact(
+        workflow_id=artifact.workflow_id,
+        agent_name=artifact.agent_name,
+        stage=artifact.stage,
+        content=content,
+        traceability=artifact.traceability,
+        quality=assess(content, source, upstream, AGENT_MAP[artifact.agent_name].defines if artifact.agent_name in AGENT_MAP else ()),
+        meta={**artifact.meta, "revision_of": artifact.artifact_id, "revision": event},
+    )
+    return artifact_response(revised, {"artifact_ids": artifact.traceability.upstream_artifact_ids})
 
 
 class SuggestEditRequest(BaseModel):
@@ -172,7 +261,6 @@ SUGGEST_SYSTEM = (
 
 @router.post("/artifacts/{artifact_id}/suggest-edit", tags=["Artifacts"])
 async def suggest_edit(artifact_id: str, payload: SuggestEditRequest):
-    """AI proposes a revision of one section. Nothing is saved until apply-edit."""
     artifact, source = _artifact_and_source(artifact_id)
     if payload.section not in artifact.content:
         raise HTTPException(status_code=404, detail=f"Section '{payload.section}' not in this output.")
@@ -193,8 +281,6 @@ async def suggest_edit(artifact_id: str, payload: SuggestEditRequest):
 
     needs_info = [str(q) for q in data.get("needs_info") or [] if str(q).strip()]
     revised = data.get("revised", current)
-    # Enforced here, not left to the model: never change the section while asking
-    # for facts, and never let it change the section's shape.
     if needs_info or type(revised) is not type(current):
         revised = current
     return {
@@ -209,18 +295,10 @@ async def suggest_edit(artifact_id: str, payload: SuggestEditRequest):
 
 @router.post("/artifacts/{artifact_id}/apply-edit", tags=["Artifacts"])
 async def apply_edit(artifact_id: str, payload: ApplyEditRequest):
-    """Save an accepted edit as a new version; earlier versions stay in history."""
     artifact, _ = _artifact_and_source(artifact_id)
     if payload.section not in artifact.content:
         raise HTTPException(status_code=404, detail=f"Section '{payload.section}' not in this output.")
-    content = {**artifact.content, payload.section: payload.value}
-    return workflow_engine.save_artifact(
-        workflow_id=artifact.workflow_id,
-        agent_name=artifact.agent_name,
-        stage=artifact.stage,
-        content=content,
-        traceability=artifact.traceability,
-    )
+    return _revise(artifact, {**artifact.content, payload.section: payload.value}, "edit")
 
 
 DECISIONS_SYSTEM = (
@@ -241,7 +319,6 @@ DECISIONS_SYSTEM = (
 
 @router.post("/artifacts/{artifact_id}/open-decisions", tags=["Artifacts"])
 async def open_decisions(artifact_id: str):
-    """Decisions the document leaves open, each with two options to choose from."""
     artifact, source = _artifact_and_source(artifact_id)
     keys = list(artifact.content.keys())
     user = (
@@ -291,7 +368,6 @@ RECORD_DECISION_SYSTEM = (
 
 @router.post("/artifacts/{artifact_id}/record-decision", tags=["Artifacts"])
 async def record_decision(artifact_id: str, payload: RecordDecisionRequest):
-    """Record a chosen option: add it to the decisions, resolve the open question, save one new version."""
     artifact, _ = _artifact_and_source(artifact_id)
     user = (
         f"QUESTION: {payload.question}\\n"
@@ -303,7 +379,6 @@ async def record_decision(artifact_id: str, payload: RecordDecisionRequest):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Savia could not record the decision: {e}")
 
-    # Only existing sections, only same-shaped values: the model can't add keys or corrupt types.
     updates = {
         key: value
         for key, value in (data.get("updates") or {}).items()
@@ -311,10 +386,4 @@ async def record_decision(artifact_id: str, payload: RecordDecisionRequest):
     }
     if not updates:
         raise HTTPException(status_code=502, detail="Savia could not work out where to record this decision.")
-    return workflow_engine.save_artifact(
-        workflow_id=artifact.workflow_id,
-        agent_name=artifact.agent_name,
-        stage=artifact.stage,
-        content={**artifact.content, **updates},
-        traceability=artifact.traceability,
-    )
+    return _revise(artifact, {**artifact.content, **updates}, "decision")

@@ -1,97 +1,79 @@
-from typing import Tuple, Optional
 from datetime import datetime
-from app.models.workflow import WorkflowSession, StageEnum, ApprovalStatus
+from typing import Any, Dict, List, Optional, Tuple
+
+from app.models.workflow import ApprovalStatus, Artifact, StageEnum, WorkflowSession
 from app.orchestration.workflow_engine import workflow_engine
 from app.utils.logger import logger
 
 
-STAGE_ORDER = [
-    StageEnum.INGESTION,
-    StageEnum.REQUIREMENTS,
-    StageEnum.MOM,
-    StageEnum.USER_STORY,
-    StageEnum.DDL3,
-    StageEnum.TESTING,
-    StageEnum.COMPLETED,
-]
-
-STAGE_PREREQUISITES = {
-    StageEnum.MOM: [],
-    StageEnum.USER_STORY: [StageEnum.REQUIREMENTS, StageEnum.MOM],
-    StageEnum.DDL3: [StageEnum.REQUIREMENTS, StageEnum.USER_STORY],
-    StageEnum.TESTING: [StageEnum.REQUIREMENTS, StageEnum.USER_STORY, StageEnum.DDL3],
-}
+class GateError(Exception):
+    pass
 
 
 class StageManager:
-    def can_advance(self, session: WorkflowSession, target_stage: StageEnum, bypass_approval: bool = False) -> Tuple[bool, str]:
-        if session.current_stage == target_stage:
-            return True, "Already at requested stage"
+    def upstream_for(self, session: WorkflowSession, consumes: Tuple[str, ...]) -> Dict[str, Any]:
+        content: Dict[str, Any] = {}
+        used: List[str] = []
+        skipped: List[str] = []
+        latest = workflow_engine.latest_artifacts(session.workflow_id)
+        for agent_id in consumes:
+            approved = workflow_engine.latest_approved(session.workflow_id, agent_id)
+            if approved:
+                content[agent_id] = approved.content
+                used.append(approved.artifact_id)
+            elif agent_id in latest:
+                skipped.append(agent_id)
+        return {"content": content, "artifact_ids": used, "unapproved": skipped}
 
-        current_idx = STAGE_ORDER.index(session.current_stage) if session.current_stage in STAGE_ORDER else 0
-        target_idx = STAGE_ORDER.index(target_stage) if target_stage in STAGE_ORDER else 0
+    def pending_artifacts(self, session: WorkflowSession) -> List[Artifact]:
+        return [
+            a for a in workflow_engine.latest_artifacts(session.workflow_id).values()
+            if a.approval_status != ApprovalStatus.APPROVED
+        ]
 
-        if target_idx < current_idx:
-            return True, "Moving back to earlier stage permitted"
-
-        if bypass_approval:
-            return True, "Approval gate bypassed by explicit user request"
-
-        # Check approval prerequisite
-        prereqs = STAGE_PREREQUISITES.get(target_stage, [])
-        for prereq in prereqs:
-            prereq_key = prereq.value
-            approval_record = session.approvals.get(prereq_key, {})
-            status = approval_record.get("status")
-            
-            # Special allowance if MOM or requirements exist in session output
-            if prereq == StageEnum.MOM and session.outputs.get("mom"):
-                continue
-            if prereq == StageEnum.USER_STORY and session.outputs.get("agile_stories"):
-                continue
-            if prereq == StageEnum.DDL3 and session.outputs.get("ddl3"):
-                continue
-
-            if status != ApprovalStatus.APPROVED.value:
-                return False, f"Cannot advance to stage '{target_stage.value}': Upstream stage '{prereq_key}' output has not been approved."
-
-        return True, "Prerequisites met"
-
-    def approve_stage(self, session: WorkflowSession, stage: StageEnum, user_id: str = "system_user", comments: str = None) -> WorkflowSession:
-        stage_key = stage.value
-        session.approvals[stage_key] = {
-            "status": ApprovalStatus.APPROVED.value,
+    def approve(
+        self,
+        session: WorkflowSession,
+        artifact: Optional[Artifact],
+        user_id: str,
+        comments: Optional[str] = None,
+        status: ApprovalStatus = ApprovalStatus.APPROVED,
+    ) -> Artifact:
+        if artifact is None:
+            raise GateError("There is no output in this workflow to approve yet.")
+        if artifact.workflow_id != session.workflow_id:
+            raise GateError("That output belongs to another workflow.")
+        now = datetime.utcnow().isoformat()
+        artifact.approval_status = status
+        artifact.approved_by = user_id
+        artifact.approved_at = now
+        artifact.approval_comments = comments
+        workflow_engine.update_artifact(artifact)
+        session.approvals[artifact.artifact_id] = {
+            "status": status.value,
+            "agent_name": artifact.agent_name,
+            "version": artifact.version,
             "approved_by": user_id,
-            "approved_at": datetime.utcnow().isoformat(),
-            "comments": comments or "Approved",
+            "approved_at": now,
+            "comments": comments,
         }
+        session.log(f"artifact_{status.value}", artifact_id=artifact.artifact_id, agent_name=artifact.agent_name,
+                    version=artifact.version, by=user_id)
+        session.status = "waiting_for_approval" if self.pending_artifacts(session) else "approved"
+        workflow_engine.update_workflow(session)
+        logger.info(f"[StageManager] {artifact.artifact_id} {status.value} by {user_id}")
+        return artifact
 
-        session.history.append({
-            "timestamp": datetime.utcnow().isoformat(),
-            "event": "stage_approved",
-            "stage": stage_key,
-            "approved_by": user_id,
-        })
-
-        logger.info(f"[StageManager] Stage '{stage_key}' approved for workflow '{session.workflow_id}' by user '{user_id}'")
-        return workflow_engine.update_workflow(session)
-
-    def advance_stage(self, session: WorkflowSession, target_stage: StageEnum, bypass_approval: bool = False) -> Tuple[bool, str, WorkflowSession]:
-        allowed, reason = self.can_advance(session, target_stage, bypass_approval=bypass_approval)
-        if not allowed:
-            return False, reason, session
-
-        previous_stage = session.current_stage
-        session.current_stage = target_stage
-        session.history.append({
-            "timestamp": datetime.utcnow().isoformat(),
-            "event": "stage_advanced",
-            "from_stage": previous_stage.value,
-            "to_stage": target_stage.value,
-        })
-        updated = workflow_engine.update_workflow(session)
-        logger.info(f"[StageManager] Workflow '{session.workflow_id}' advanced from '{previous_stage.value}' to '{target_stage.value}'")
-        return True, f"Advanced to stage '{target_stage.value}'", updated
+    def move_to(self, session: WorkflowSession, stage: StageEnum, require_approved: bool = False) -> WorkflowSession:
+        if require_approved:
+            pending = self.pending_artifacts(session)
+            if pending:
+                names = ", ".join(f"{a.agent_name} v{a.version}" for a in pending)
+                raise GateError(f"Approve these outputs before moving on: {names}.")
+        if session.current_stage != stage:
+            session.log("stage_advanced", from_stage=session.current_stage.value, to_stage=stage.value)
+            session.current_stage = stage
+        return session
 
 
 stage_manager = StageManager()

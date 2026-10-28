@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class WorkflowCreateRequest(BaseModel):
@@ -25,15 +25,16 @@ class RecommendationResponse(BaseModel):
     primary_reason: str
     missing_information: List[str]
     next_action: str
-    # "llm" when an AI model chose; "keyword" when it fell back to keyword scoring.
+    plan: List[Dict[str, Any]] = []
     source: str = "keyword"
 
 
 class ApproveStageRequest(BaseModel):
-    user_id: Optional[str] = "system_user"
-    comments: Optional[str] = "Approved"
+    artifact_id: Optional[str] = None
+    user_id: Optional[str] = None
+    comments: Optional[str] = None
+    decision: str = "approved"
 
 
 class AdvanceStageRequest(BaseModel):
     target_stage: str
-    bypass_approval: Optional[bool] = False

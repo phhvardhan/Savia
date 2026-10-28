@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useRun } from '../../state/run';
 import { useAttachment } from '../../state/attachment';
 import { resetOnce } from '../../lib/once';
-// AUTH DISABLED — restore with: import { useAuth } from '../../auth/context';
+import { useAuth } from '../../auth/context';
 import {
   BellIcon,
   ChevronDownIcon,
@@ -21,11 +21,6 @@ const NAV_ITEMS = [
   { label: 'Projects', to: '/projects' },
 ];
 
-/**
- * Stand-in for the signed-in user while auth is switched off.
- * Restoring auth: delete this and bring back `const { user, logout } = useAuth()`
- * along with the account menu (see the git-free copy in App.tsx's restore note).
- */
 const DEMO_USER = {
   greeting: 'Mrunal',
   role: 'SAP Delivery',
@@ -36,6 +31,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { resetAll } = useRun();
   const { setAttachment } = useAttachment();
+  const { user, logout } = useAuth();
+  const greeting = user ? user.full_name.split(' ')[0] || user.username : DEMO_USER.greeting;
+  const role = user ? user.department || user.roles.join(', ') : DEMO_USER.role;
 
   const handleStartNewRun = () => {
     resetAll();
@@ -130,12 +128,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button type="button" className={styles.iconButton} aria-label="Notifications">
               <BellIcon />
             </button>
-            <button type="button" className={styles.user}>
+            <button
+              type="button"
+              className={styles.user}
+              onClick={user ? logout : undefined}
+              title={user ? 'Sign out' : undefined}
+            >
               <img className={styles.avatar} src={DEMO_USER.avatar} alt="" />
               <span className={styles.who}>
-                <span className={styles.userGreeting}>Hello, {DEMO_USER.greeting}</span>
+                <span className={styles.userGreeting}>Hello, {greeting}</span>
                 <span className={styles.userRole}>
-                  {DEMO_USER.role}
+                  {role}
                   <ChevronDownIcon />
                 </span>
               </span>

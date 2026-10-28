@@ -23,7 +23,7 @@ export interface RunState {
    * button rather than a page effect, so exactly one request goes out per
    * click and the writing page only has to display it.
    */
-  startAgentRun: (agentId: string) => void;
+  startAgentRun: (agentId: string, input?: UploadResult, sourceArtifactId?: string) => void;
   /** Erases all current run state to start a completely fresh run from the beginning. */
   resetAll: () => void;
 }

@@ -468,8 +468,8 @@ export function ReadingPage() {
               onClick={() => {
                 // Fire the agent and move on: the writing page shows its progress.
                 if (chosen) startAgentRun(chosen.agent);
-                // TEST has its own screens (13–19); every other agent goes 05 → 11.
-                navigate(chosen?.agent === 'test' ? '/test-ready' : '/writing');
+                // Every agent, TEST included, runs for real and opens its own document.
+                navigate('/writing');
               }}
             >
               Approve and start

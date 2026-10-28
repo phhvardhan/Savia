@@ -1,135 +1,97 @@
-from typing import List, Dict, Any
+from datetime import datetime, timedelta
+from typing import Any, Dict
+
 from fastapi import APIRouter
+
+from app.agents import AGENT_MAP
+from app.core.db import db
+from app.orchestration.stage_manager import stage_manager
 from app.orchestration.workflow_engine import workflow_engine
 
 router = APIRouter()
 
+STAGE_LABELS = {
+    "ingestion": "Intake",
+    "requirements": "Requirements",
+    "mom": "Requirements",
+    "user_story": "Requirements",
+    "ddl3": "Design",
+    "testing": "Testing",
+    "completed": "Release",
+}
+IMAGES = ["/assets/ran1.jpg", "/assets/ran2.jpg", "/assets/ran3.jpg"]
+ACCENTS = ["accentRed", "accentTagBlue", "accentTagGreen"]
+
+
+def _times(count: int) -> str:
+    return "Used once this week" if count == 1 else "Used twice this week" if count == 2 else f"Used {count} times this week"
+
 
 @router.get("/dashboard", tags=["SAVIA Dashboard"])
 async def get_dashboard_summary() -> Dict[str, Any]:
-    """
-    Returns dynamic dashboard summary including status counters,
-    active agent runs, and weekly execution history.
-    """
     workflows = workflow_engine.list_workflows()
-    
-    # Calculate dynamic counters
-    running_count = sum(1 for w in workflows if w.status == "in_progress")
-    waiting_count = sum(1 for w in workflows if w.status == "waiting_for_approval")
-    stale_count = sum(1 for w in workflows if w.status in ("failed", "stale"))
+    running = db.query("SELECT agent_id, workflow_id, started_at FROM runs WHERE status IN ('queued', 'running')")
+    failed = db.query("SELECT COUNT(*) AS n FROM runs WHERE status = 'failed'")[0]["n"]
+    waiting = [w for w in workflows if stage_manager.pending_artifacts(w)]
 
-    # Default baseline dynamic numbers if database is starting fresh
     counters = [
         {
             "id": "running",
-            "value": str(max(running_count, 4)),
+            "value": str(len(running)),
             "label": "Running for you",
-            "hint": f"Across {max(len(workflows), 2)} projects · 1 finished overnight",
+            "hint": f"Across {len({r['workflow_id'] for r in running})} workflows" if running else "Nothing running right now",
             "accent": "accentYellow",
         },
         {
             "id": "waiting",
-            "value": str(max(waiting_count, 2)),
+            "value": str(len(waiting)),
             "label": "Waiting on your approval",
-            "hint": "The oldest has waited 2 hours",
+            "hint": f"{sum(len(stage_manager.pending_artifacts(w)) for w in waiting)} outputs to review" if waiting else "Nothing waiting",
             "accent": "accentMagenta",
         },
         {
             "id": "stale",
-            "value": str(max(stale_count, 3)),
-            "label": "Marked stale",
-            "hint": "An upstream document changed",
+            "value": str(failed),
+            "label": "Failed runs",
+            "hint": "Open the workflow to retry" if failed else "No failed runs",
             "accent": "accentAmber",
         },
     ]
 
-    # Active Runs section ("What is running right now")
-    active_runs = []
-    if workflows:
-        for w in workflows[:5]:
-            outputs_dict = getattr(w, "outputs", {}) or {}
-            completed_outputs = sum(1 for v in outputs_dict.values() if v is not None)
-            active_runs.append({
-                "id": w.workflow_id,
-                "title": f"{w.current_stage.value.upper()} · {w.title}",
-                "meta": f"Release 2.1 · {w.status.replace('_', ' ').title()}",
-                "metricLabel": "Coverage",
-                "metricValue": f"{completed_outputs} of {len(w.source_documents) + 1}",
-                "state": "Needs you" if w.status == "waiting_for_approval" else "Running" if w.status == "in_progress" else "Approved",
-                "stateTone": "runningSoft" if w.status in ("waiting_for_approval", "in_progress") else "doneSoft",
-                "accent": "accentOrange" if w.status == "waiting_for_approval" else "accentGreen" if w.status == "in_progress" else "accentBlue"
-            })
+    runs = []
+    for w in workflows[:5]:
+        latest = workflow_engine.latest_artifacts(w.workflow_id)
+        pending = [a for a in latest.values() if a.approval_status.value != "approved"]
+        state = "Needs you" if pending else "Running" if w.status == "in_progress" else "Approved"
+        runs.append({
+            "id": w.workflow_id,
+            "title": f"{STAGE_LABELS.get(w.current_stage.value, w.current_stage.value)} · {w.title}",
+            "meta": w.status.replace("_", " ").capitalize(),
+            "metricLabel": "Approved outputs",
+            "metricValue": f"{len(latest) - len(pending)} of {len(latest)}",
+            "state": state,
+            "stateTone": "doneSoft" if state == "Approved" else "runningSoft",
+            "accent": "accentOrange" if pending else "accentGreen" if w.status == "in_progress" else "accentBlue",
+        })
 
-    if not active_runs:
-        active_runs = [
-            {
-                "id": "test",
-                "title": "TEST · 62 test cases",
-                "meta": "TIME Release 2.1 · built from the design D. Blanco approved",
-                "metricLabel": "Coverage",
-                "metricValue": "18 of 20",
-                "state": "Needs you",
-                "stateTone": "runningSoft",
-                "accent": "accentOrange",
-            },
-            {
-                "id": "change",
-                "title": "Change Impact · release scan",
-                "meta": "TIME Release 2.1 · running alongside TEST",
-                "metricLabel": "Systems checked",
-                "metricValue": "3 of 7",
-                "state": "Running",
-                "stateTone": "runningSoft",
-                "accent": "accentGreen",
-            },
-            {
-                "id": "ddl3",
-                "title": "DDL3 · functional design",
-                "meta": "Vendor workflow · Release 3.1",
-                "metricLabel": "Sections",
-                "metricValue": "7 of 7",
-                "state": "Approved",
-                "stateTone": "doneSoft",
-                "accent": "accentBlue",
-            },
-        ]
-
+    since = (datetime.utcnow() - timedelta(days=7)).isoformat()
+    weekly = db.query(
+        "SELECT agent_id, COUNT(*) AS n FROM runs WHERE status = 'done' AND finished_at >= ?"
+        " GROUP BY agent_id ORDER BY n DESC LIMIT 3",
+        (since,),
+    )
     ran_this_week = [
         {
-            "id": "mom",
-            "title": "Minutes and actions",
-            "text": "Turned a 90-minute design workshop into 6 decisions and 8 owned actions",
-            "stage": "Requirements",
-            "stageHref": "/start",
-            "usage": "Used 4 times this week",
-            "image": "/assets/ran1.jpg",
-            "accent": "accentRed",
-        },
-        {
-            "id": "ddl3",
-            "title": "DDL3 Agent",
-            "text": "Wrote the functional design for the coding block extension approved first time",
-            "stage": "Design",
+            "id": row["agent_id"],
+            "title": AGENT_MAP[row["agent_id"]].name if row["agent_id"] in AGENT_MAP else row["agent_id"],
+            "text": AGENT_MAP[row["agent_id"]].purpose if row["agent_id"] in AGENT_MAP else "",
+            "stage": STAGE_LABELS.get(AGENT_MAP[row["agent_id"]].stage.value, "") if row["agent_id"] in AGENT_MAP else "",
             "stageHref": None,
-            "usage": "Used twice this week",
-            "image": "/assets/ran2.jpg",
-            "accent": "accentTagBlue",
-        },
-        {
-            "id": "test",
-            "title": "TEST Agent",
-            "text": "62 SIT cases from an approved design, with the two gaps named rather than hidden",
-            "stage": "Testing",
-            "stageHref": None,
-            "usage": "Used once this week",
-            "image": "/assets/ran3.jpg",
-            "accent": "accentTagGreen",
-        },
+            "usage": _times(row["n"]),
+            "image": IMAGES[i % len(IMAGES)],
+            "accent": ACCENTS[i % len(ACCENTS)],
+        }
+        for i, row in enumerate(weekly)
     ]
 
-    return {
-        "counters": counters,
-        "runs": active_runs,
-        "ran_this_week": ran_this_week,
-        "total_workflows": len(workflows)
-    }
+    return {"counters": counters, "runs": runs, "ran_this_week": ran_this_week, "total_workflows": len(workflows)}

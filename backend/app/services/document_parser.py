@@ -1,14 +1,11 @@
 import os
-import tempfile
 from typing import Dict, Any, Tuple
-from app.core.extract import extract_text_from_file, AUDIO_VIDEO_EXT, DOC_EXT
+from starlette.concurrency import run_in_threadpool
+from app.core.extract import extract_text_from_file
 from app.utils.logger import logger
 
 
 class DocumentParserService:
-    def __init__(self):
-        pass
-
     def detect_input_type(self, filename: str) -> str:
         ext = os.path.splitext(filename)[1].lower()
         if ext in {".mp3", ".wav", ".m4a"}:
@@ -25,11 +22,11 @@ class DocumentParserService:
             return "txt"
         return "unstructured_text"
 
-    async def parse_and_normalize(self, file_path: str, filename: str, api_key: str = None) -> Tuple[str, str, Dict[str, Any]]:
+    async def parse_and_normalize(self, file_path: str, filename: str) -> Tuple[str, str, Dict[str, Any]]:
         input_type = self.detect_input_type(filename)
         logger.info(f"[DocumentParser] Parsing file '{filename}' of type '{input_type}' from '{file_path}'")
         
-        extracted_text = extract_text_from_file(file_path, api_key=api_key)
+        extracted_text = await run_in_threadpool(extract_text_from_file, file_path)
         normalized_text = extracted_text.strip()
         
         metadata = {

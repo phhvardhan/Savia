@@ -23,13 +23,12 @@ def test_agents_route_lists_and_guards():
     listed = client.get("/api/v1/agents").json()
     assert [a["id"] for a in listed] == [a.id for a in AGENTS]
     assert client.post("/api/v1/agents/nope", json={"input_text": "x"}).status_code == 404
-    # Empty input is refused rather than invented.
-    session = client.post("/api/v1/agents/mom", json={"input_text": " ", "bypass_approval": True})
+    session = client.post("/api/v1/agents/mom", json={"input_text": " "})
     assert session.status_code in (400, 422), session.text
 
 
 def test_names_match_the_frontend():
-    """One nomenclature: ids and names come from the frontend's AGENT_META."""
+
     import re
     from pathlib import Path
     ts = (Path(__file__).parents[2] / "frontend/src/lib/savia.ts").read_text(encoding="utf-8")

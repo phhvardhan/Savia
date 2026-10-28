@@ -1,8 +1,12 @@
+import hashlib
 import json
-from typing import List, Dict, Any
-from app.models.workflow import WorkflowSession, StageEnum
-from app.core.agent import call_llm, fit_text
-from app.agents import AGENTS
+from collections import OrderedDict
+from typing import Any, Dict, List
+
+from app.agents import AGENT_MAP, AGENTS
+from app.core.llm import call_llm
+from app.core.text import fit_text
+from app.models.workflow import StageEnum, WorkflowSession
 from app.utils.logger import logger
 
 
@@ -10,10 +14,10 @@ ALL_AGENTS = [(agent.id, agent.name, agent.required_inputs) for agent in AGENTS]
 
 UNMATCHED_CONFIDENCE = 0.40
 
-# What each agent produces, so the LLM chooses on purpose rather than on name.
 AGENT_PURPOSES = {agent.id: agent.purpose for agent in AGENTS}
 
-LLM_INPUT_CHARS = 9000
+LLM_INPUT_CHARS = 16000
+CACHE_SIZE = 64
 STAGE_VALUES = [s.value for s in StageEnum]
 
 RECOMMENDER_SYSTEM = (
@@ -39,12 +43,38 @@ RECOMMENDER_SYSTEM = (
 )
 
 
+def build_plan(recommended: List[Dict[str, Any]], produced: List[str]) -> List[Dict[str, Any]]:
+    chosen = [r["agent"] for r in recommended if r.get("matched") and r.get("confidence", 0) >= UNMATCHED_CONFIDENCE]
+    if not chosen and recommended and recommended[0].get("matched"):
+        chosen = [recommended[0]["agent"]]
+    ordered: List[str] = []
+
+    def visit(agent_id: str, trail: tuple) -> None:
+        if agent_id in ordered or agent_id in trail:
+            return
+        for dep in AGENT_MAP[agent_id].consumes:
+            if dep in chosen:
+                visit(dep, trail + (agent_id,))
+        ordered.append(agent_id)
+
+    for agent_id in chosen:
+        visit(agent_id, ())
+    return [
+        {
+            "step": i + 1,
+            "agent": agent_id,
+            "agent_name": AGENT_MAP[agent_id].name,
+            "after": [d for d in AGENT_MAP[agent_id].consumes if d in ordered[:i]],
+            "uses_existing": [d for d in AGENT_MAP[agent_id].consumes if d in produced],
+            "approval_needed_before_next": any(agent_id in AGENT_MAP[o].consumes for o in ordered[i + 1:]),
+        }
+        for i, agent_id in enumerate(ordered)
+    ]
+
+
 class SaviaOrchestrator:
-    """
-    SAVIA Central Orchestrator & Agent Recommendation Layer.
-    Analyzes normalized user input (Audio/Video/PDF/DOC/TXT), document titles,
-    and SDLC context to recommend the optimal agent out of all 8 modular SDLC agents.
-    """
+    def __init__(self):
+        self._cache: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
 
     async def recommend(
         self,
@@ -53,14 +83,24 @@ class SaviaOrchestrator:
         input_type: str = None,
         filename: str = None,
     ) -> Dict[str, Any]:
-        """LLM recommendation; falls back to keyword scoring if no provider answers."""
+        text = raw_text or (session.normalized_input if session else "") or ""
+        produced = sorted(k for k, v in (session.outputs or {}).items() if v) if session else []
+        key = hashlib.sha256(json.dumps([text, input_type, filename, produced]).encode("utf-8")).hexdigest()
+        if key in self._cache:
+            self._cache.move_to_end(key)
+            return {**self._cache[key], "workflow_id": session.workflow_id if session else None}
         try:
-            return await self.recommend_with_llm(session, raw_text, input_type, filename)
+            result = await self.recommend_with_llm(session, raw_text, input_type, filename)
         except Exception as e:
             logger.warning(f"[SAVIA Recommender] LLM unavailable ({e}); falling back to keyword scoring.")
             result = self.analyze_and_recommend(session, raw_text, input_type, filename)
             result["source"] = "keyword"
-            return result
+        result["plan"] = build_plan(result["recommended_agents"], produced)
+        if result["source"] == "llm":
+            self._cache[key] = result
+            if len(self._cache) > CACHE_SIZE:
+                self._cache.popitem(last=False)
+        return result
 
     async def recommend_with_llm(
         self,
@@ -71,10 +111,8 @@ class SaviaOrchestrator:
     ) -> Dict[str, Any]:
         text = raw_text or (session.normalized_input if session else "") or ""
         i_type = input_type or (session.input_type if session else "unknown")
-        # Only outputs with content; the session pre-creates empty slots for every stage.
         prior_outputs = sorted(k for k, v in (session.outputs or {}).items() if v) if session else []
 
-        # ponytail: 9000 chars shared fairly across files; summarise per file if long inputs pick badly.
         user = (
             f"FILENAME: {filename or '(typed by the user)'}\n"
             f"INPUT TYPE: {i_type}\n"
@@ -91,7 +129,7 @@ class SaviaOrchestrator:
         for item in data.get("recommendations") or []:
             aid = str(item.get("agent", "")).strip()
             if aid not in agent_names or any(r["agent"] == aid for r in recommended):
-                continue  # unknown id or duplicate from the model
+                continue
             try:
                 conf = float(item.get("confidence", 0))
             except (TypeError, ValueError):
@@ -110,7 +148,6 @@ class SaviaOrchestrator:
         if not recommended and not isinstance(data.get("recommendations"), list):
             raise ValueError(f"LLM reply had no recommendations list: {json.dumps(data)[:300]}")
 
-        # An empty list is a real answer ("nothing fits yet"), not a failure.
         recommended.sort(key=lambda r: r["confidence"], reverse=True)
         primary = recommended[0] if recommended else None
 
@@ -158,7 +195,6 @@ class SaviaOrchestrator:
         i_type = input_type or (session.input_type if session else "unknown")
         current_stage = session.current_stage if session else StageEnum.INGESTION
 
-        # Extract document name / filename from argument, session title, or source documents
         doc_name = filename or ""
         if not doc_name and session:
             if session.title and "Workflow - " in session.title:
@@ -176,11 +212,7 @@ class SaviaOrchestrator:
 
         reasons: Dict[str, str] = {}
 
-        # ---------------------------------------------------------------------
-        # 1. FILENAME MATCHING (Heavy weight if document explicitly named)
-        # ---------------------------------------------------------------------
         if doc_name_lower:
-            # DDL3 Design Document
             if any(k in doc_name_lower for k in [
                 "ddl3", "ddl_3", "detailed_design", "design_spec", "functional_spec",
                 "technical_spec", "architecture_spec", "fad", "tad", "design_doc",
@@ -189,7 +221,6 @@ class SaviaOrchestrator:
                 scores["ddl3"] += 30.0
                 reasons["ddl3"] = f"Document '{doc_name}' is a DDL3 Design & Technical Architecture Specification."
 
-            # Test Document
             if any(k in doc_name_lower for k in [
                 "test_case", "test_plan", "test_suite", "test_inventory", "test_spec",
                 "qa_plan", "uat_plan", "fit_plan", "manual_test", "test_matrix"
@@ -204,62 +235,49 @@ class SaviaOrchestrator:
                 scores["test"] += 18.0
                 reasons["test"] = f"Document '{doc_name}' indicates test deliverables."
 
-            # Agile User Stories
             if any(k in doc_name_lower for k in [
                 "user_stories", "user_story", "stories", "backlog", "jira", "epics", "brd", "prd"
             ]):
                 scores["agile-stories"] += 30.0
                 reasons["agile-stories"] = f"Document '{doc_name}' indicates Agile User Stories & Backlog Epics."
 
-            # Meeting Minutes
             if any(k in doc_name_lower for k in [
                 "mom", "minutes", "transcript", "meeting", "recording", "call_notes", "discussion"
             ]):
                 scores["mom"] += 30.0
                 reasons["mom"] = f"Document '{doc_name}' indicates a Meeting Transcript or Minutes of Meeting."
 
-            # Readiness & Audit
             if any(k in doc_name_lower for k in [
                 "readiness", "scorecard", "audit", "sdlc_audit", "quality_gate", "gxp_audit"
             ]):
                 scores["readiness-audit"] += 30.0
                 reasons["readiness-audit"] = f"Document '{doc_name}' indicates a Delivery Readiness Audit or Quality Scorecard."
 
-            # Gap Analysis
             if any(k in doc_name_lower for k in [
                 "gap_analysis", "rtm", "traceability_matrix", "fit_gap"
             ]):
                 scores["gap-analysis"] += 30.0
                 reasons["gap-analysis"] = f"Document '{doc_name}' indicates a Requirement Gap Analysis & RTM."
 
-            # Change Impact
             if any(k in doc_name_lower for k in [
                 "change_impact", "impact_assessment", "interdependency"
             ]):
                 scores["change-impact"] += 30.0
                 reasons["change-impact"] = f"Document '{doc_name}' indicates a Change Impact Assessment & Interdependency Matrix."
 
-            # KDD Package
             if any(k in doc_name_lower for k in [
                 "kdd", "dab", "design_authority", "architecture_dossier"
             ]):
                 scores["kdd-dab"] += 30.0
                 reasons["kdd-dab"] = f"Document '{doc_name}' indicates a KDD Package for Design Authority Board review."
 
-        # ---------------------------------------------------------------------
-        # 2. INPUT TYPE SIGNALS
-        # ---------------------------------------------------------------------
         if i_type in ["audio", "video"]:
             scores["mom"] += 35.0
             reasons["mom"] = "The input consists of audio/video recording best suited for Minutes of Meeting and action item extraction."
 
-        # ---------------------------------------------------------------------
-        # 3. CONTENT SIGNATURE PHRASES & KEYWORDS
-        # ---------------------------------------------------------------------
         def count_matches(keywords: List[str]) -> int:
             return sum(1 for kw in keywords if kw in text_lower)
 
-        # MOM
         mom_signatures = [
             "meeting transcript", "minutes of meeting", "meeting minutes",
             "meeting attendees", "meeting date", "action items:", "speaker 1:",
@@ -276,7 +294,6 @@ class SaviaOrchestrator:
             if "mom" not in reasons:
                 reasons["mom"] = "The input consists of discussion text best suited for Minutes of Meeting and action item extraction."
 
-        # Agile User Stories
         story_signatures = [
             "as a ", "i want to ", "so that ", "user story", "acceptance criteria",
             "given ", "when ", "then ", "invest criteria", "sprint backlog", "epic:"
@@ -292,7 +309,6 @@ class SaviaOrchestrator:
             if "agile-stories" not in reasons:
                 reasons["agile-stories"] = "The requirement context contains functional capabilities suitable for INVEST user stories and BDD acceptance criteria."
 
-        # DDL3 Design
         ddl3_signatures = [
             "ddl3", "detailed design", "technical design", "functional design",
             "system architecture", "database schema", "table definition",
@@ -312,8 +328,6 @@ class SaviaOrchestrator:
             if "ddl3" not in reasons:
                 reasons["ddl3"] = "The input specifies architecture, technical specifications, or functional components suited for Design Document Lifecycle (DDL3) management."
 
-        # Test Automation & Inventory
-        # Notice: Only count genuine test markers (not isolated words like "validation" or "scenario" which belong to design)
         test_signatures = [
             "test case id", "test cases matrix", "test execution plan", "test inventory",
             "manual test cases", "test steps:", "expected result:", "actual result:",
@@ -331,7 +345,6 @@ class SaviaOrchestrator:
             if "test" not in reasons:
                 reasons["test"] = "The available requirements/design artifacts permit end-to-end FIT/UAT test inventory generation, manual test cases, and scenario stitching."
 
-        # Readiness Scoring & SDLC Audit
         readiness_signatures = [
             "delivery readiness", "readiness score", "readiness scorecard",
             "sdlc audit", "quality gate", "gxp compliance audit", "audit findings",
@@ -348,7 +361,6 @@ class SaviaOrchestrator:
             if "readiness-audit" not in reasons:
                 reasons["readiness-audit"] = "The input contains deliverables requiring multi-dimensional quality scorecards, GxP compliance audit, and readiness scoring."
 
-        # Gap Analysis & RTM
         gap_signatures = [
             "requirements traceability matrix", "rtm", "gap analysis",
             "requirement gap", "standard vs custom gap", "unmet requirement",
@@ -362,7 +374,6 @@ class SaviaOrchestrator:
             if "gap-analysis" not in reasons:
                 reasons["gap-analysis"] = "The input requires requirement traceability mapping (RTM) and standard vs custom gap analysis."
 
-        # Change Impact Assessment
         impact_signatures = [
             "change impact assessment", "interdependency matrix", "cross-platform impact",
             "system decommission", "blast radius", "workstream dependency"
@@ -375,7 +386,6 @@ class SaviaOrchestrator:
             if "change-impact" not in reasons:
                 reasons["change-impact"] = "The input demands cross-platform impact analysis and interdependency matrix evaluation."
 
-        # Solution Analyzer
         solution_signatures = [
             "problem statement", "solution blueprint", "solution design", "proposed solution",
             "solution options", "how should we solve", "pain point"
@@ -388,7 +398,6 @@ class SaviaOrchestrator:
             if "solution-analyzer" not in reasons:
                 reasons["solution-analyzer"] = "The input describes a problem that needs a proposed solution design."
 
-        # KDD Package for DAB
         kdd_signatures = [
             "knowledge design document", "kdd package", "design authority board",
             "dab review", "architecture dossier", "architectural decision record", "adr"
@@ -401,20 +410,17 @@ class SaviaOrchestrator:
             if "kdd-dab" not in reasons:
                 reasons["kdd-dab"] = "The input involves architecture governance dossiers tailored for Design Authority Board (DAB) review."
 
-        # Upstream / downstream pipeline stage synergy
         if session and session.outputs:
             if session.outputs.get("mom") and scores["agile-stories"] > 0:
                 scores["agile-stories"] += 5.0
-            if session.outputs.get("agile_stories") and scores["ddl3"] > 0:
+            if session.outputs.get("agile-stories") and scores["ddl3"] > 0:
                 scores["ddl3"] += 5.0
             if session.outputs.get("ddl3") and scores["test"] > 0:
                 scores["test"] += 5.0
 
-        # Build list of matching agents
         agent_names = {a[0]: a[1] for a in ALL_AGENTS}
         agent_inputs = {a[0]: a[2] for a in ALL_AGENTS}
 
-        # Lifecycle companion agents to ensure all 3 recommendation cards are populated
         LIFECYCLE_COMPANIONS: Dict[str, List[tuple]] = {
             "solution-analyzer": [
                 ("change-impact", "Assess the impact of the proposed solution on current systems", 0.93),
@@ -463,7 +469,6 @@ class SaviaOrchestrator:
             ],
         }
 
-        # Filter agents that have a positive score
         positive_agents = [(aid, scores[aid]) for aid in scores if scores[aid] > 0]
         positive_agents.sort(key=lambda x: x[1], reverse=True)
 
@@ -473,7 +478,6 @@ class SaviaOrchestrator:
             top_agent, top_score = positive_agents[0]
 
             for aid, score in positive_agents:
-                # Relative confidence: top agent gets 0.95 - 0.98, runners up get proportional confidence
                 if aid == top_agent:
                     conf = min(0.98, 0.95 + 0.03 * min(1.0, top_score / 40.0))
                 else:
@@ -489,7 +493,6 @@ class SaviaOrchestrator:
                     "matched": True,
                 })
         else:
-            # Fallback if no keywords matched
             top_agent = "mom"
             recommended_agents.append({
                 "agent": "mom",
@@ -500,7 +503,6 @@ class SaviaOrchestrator:
                 "matched": True,
             })
 
-        # Fill up to 5 matched agents so every recommendation card on the Reading screen renders
         matched_ids = {entry["agent"] for entry in recommended_agents}
         companions = LIFECYCLE_COMPANIONS.get(top_agent, LIFECYCLE_COMPANIONS["ddl3"])
 
@@ -518,11 +520,9 @@ class SaviaOrchestrator:
                 })
                 matched_ids.add(comp_id)
 
-        # Re-sort so top agent is always #1 and confidences descend cleanly
         recommended_agents.sort(key=lambda x: (x.get("matched", False), x.get("confidence", 0)), reverse=True)
         primary_recommendation = recommended_agents[0]
 
-        # Add remaining unmatched agents with low confidence so UI can show fuller plan if needed
         all_matched_ids = {entry["agent"] for entry in recommended_agents}
         for agent_id, agent_name, required_inputs in ALL_AGENTS:
             if agent_id in all_matched_ids:

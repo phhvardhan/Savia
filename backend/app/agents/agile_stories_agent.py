@@ -1,9 +1,52 @@
-import json
-from typing import Dict, Any, Optional
+from typing import Any, Dict
+
 from app.agents.base import BaseAgent
+from app.agents.schemas import AgileStoriesOutput
 from app.models.workflow import StageEnum
-from app.core.agent import call_llm, fit_text
 from app.utils.logger import logger
+
+SYSTEM = (
+    "You are an expert Agile Product Manager and Scrum Master. Convert requirements into Agile backlog artifacts.\n"
+    "RULES:\n"
+    "1. Create INVEST-compliant user stories (Independent, Negotiable, Valuable, Estimable, Small, Testable). "
+    "Every story delivers one user-visible capability the input describes. Never write filler stories about a "
+    "system or portal merely existing or being available: a requirement that only names the system is context for the epic, not a story.\n"
+    "2. Write Given/When/Then acceptance criteria using only behaviour the input describes. Give every story a "
+    "happy-path criterion and, where the input implies one (a rejection, a deadline, an invalid or unsupported "
+    "input, a failure), a criterion for that case too. When the input names two outcomes (approve or reject), "
+    "write one criterion per outcome. If the input gives no testable behaviour for a story, "
+    "leave acceptance_criteria empty and add a question to open_questions.\n"
+    "3. story_points: Fibonacci (1, 2, 3, 5, 8, 13), differentiated by each story's relative size, only when the "
+    "scope is clear enough to size; otherwise null. priority: only when the input implies an order or "
+    "importance; otherwise null. Never give every story the same value.\n"
+    "4. Epics are themes that group two or more related stories, named after the input's own themes. A "
+    "requirement that yields a single story belongs under a broader epic, not its own.\n"
+    "5. requirement_ids: the REQ- IDs from the input or the approved minutes that the story implements. Every "
+    "story that implements a requirement lists its ID; use [] only when the input has no matching REQ- ID.\n"
+    "6. Do not invent requirements that the input does not mention. Put unresolved risks and decisions in "
+    "open_questions.\n"
+    "Return only JSON in this shape:\n"
+    "{\n"
+    '  "epics": ["<epic>"],\n'
+    '  "user_stories": [\n'
+    "    {\n"
+    '      "user_story_id": "US-001",\n'
+    '      "epic": "<epic>",\n'
+    '      "title": "<story title>",\n'
+    '      "description": "<story description>",\n'
+    '      "as_a": "<role>",\n'
+    '      "i_want": "<capability>",\n'
+    '      "so_that": "<benefit>",\n'
+    '      "acceptance_criteria": [{"given": "<state>", "when": "<event>", "then": "<outcome>"}],\n'
+    '      "story_points": 3,\n'
+    '      "priority": "High" | "Medium" | "Low" | null,\n'
+    '      "dependencies": ["US-000"],\n'
+    '      "requirement_ids": ["REQ-001"]\n'
+    "    }\n"
+    "  ],\n"
+    '  "open_questions": ["<what the team must clarify>"]\n'
+    "}"
+)
 
 
 class AgileStoriesAgent(BaseAgent):
@@ -12,76 +55,32 @@ class AgileStoriesAgent(BaseAgent):
     purpose = "Turns requirements, BRDs or meeting outcomes into INVEST user stories with Given/When/Then acceptance criteria."
     stage = StageEnum.USER_STORY
     required_inputs = ["approved_requirements_or_mom"]
+    consumes = ("mom",)
+    defines = ("US",)
+    output_model = AgileStoriesOutput
+    prompt_version = "3"
 
-    async def run(self, input_data: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
-        requirements_text = input_data.get("normalized_input") or input_data.get("text") or ""
-        mom_content = input_data.get("mom") or input_data.get("outputs", {}).get("mom") or {}
+    async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        source = await self.source(input_data)
+        upstream = self.upstream_block(input_data, {"mom": "MINUTES OF MEETING"})
+        if not (source.strip() or upstream):
+            raise ValueError("No requirements or approved minutes to write user stories from.")
+        user = f"REQUIREMENTS INPUT:\n{source}\n\n{upstream}".strip()
+        logger.info(f"[AgileStoriesAgent] Writing stories from {len(user)} chars")
+        data = await self.generate(SYSTEM, user)
 
-        context_str = f"REQUIREMENTS INPUT:\n{fit_text(requirements_text, 8000)}\n\n"
-        if mom_content:
-            context_str += f"MOM CONTEXT:\n{json.dumps(mom_content)}\n"
-
-        if not context_str.strip():
-            raise ValueError("No input text or MOM context provided for Agile User Story Agent.")
-
-        logger.info(f"[AgileStoriesAgent] Generating INVEST user stories from context length {len(context_str)}...")
-
-        system = (
-            "You are an expert Agile Product Manager and Scrum Master. Convert approved requirements into Agile backlog artifacts.\n"
-            "REQUIREMENTS & COMPLIANCE RULES:\n"
-            "1. Create INVEST-compliant user stories (Independent, Negotiable, Valuable, Estimable, Small, Testable).\n"
-            "2. Generate Given-When-Then BDD acceptance criteria objects.\n"
-            "3. Assign story-point estimates (Fibonacci: 1, 2, 3, 5, 8, 13) for sprint planning.\n"
-            "4. Organize stories under appropriate Epics.\n"
-            "5. Ground all stories strictly in the provided input without inventing unmentioned requirements.\n"
-            "Return valid JSON matching this exact schema:\n"
-            "{\n"
-            '  "epics": ["Epic Title 1", "Epic Title 2"],\n'
-            '  "user_stories": [\n'
-            '    {\n'
-            '      "user_story_id": "US-001",\n'
-            '      "epic": "Epic Title 1",\n'
-            '      "title": "Clear user story title",\n'
-            '      "description": "Comprehensive story description",\n'
-            '      "as_a": "Role",\n'
-            '      "i_want": "Capability",\n'
-            '      "so_that": "Business value benefit",\n'
-            '      "acceptance_criteria": [\n'
-            '        {\n'
-            '          "given": "Precondition state",\n'
-            '          "when": "Action event occurs",\n'
-            '          "then": "Expected outcome response"\n'
-            '        }\n'
-            '      ],\n'
-            '      "story_points": 3,\n'
-            '      "priority": "High" | "Medium" | "Low",\n'
-            '      "dependencies": ["US-000"]\n'
-            '    }\n'
-            '  ]\n'
-            "}"
-        )
-
-        stories_data = await call_llm(system, context_str, api_key=api_key, expected_type=dict)
-
-        # Fallback defaults if LLM omitted required keys
-        if "epics" not in stories_data or not isinstance(stories_data["epics"], list):
-            stories_data["epics"] = list(set(s.get("epic", "Core Platform") for s in stories_data.get("user_stories", []))) or ["General Requirements"]
-
-        if "user_stories" not in stories_data or not isinstance(stories_data["user_stories"], list):
-            stories_data["user_stories"] = []
-
-        # Guarantee ID & structure for each story
-        for idx, story in enumerate(stories_data["user_stories"]):
-            if "user_story_id" not in story:
-                story["user_story_id"] = f"US-{idx+1:03d}"
-            if "acceptance_criteria" not in story or not story["acceptance_criteria"]:
-                story["acceptance_criteria"] = [{
-                    "given": "The user is authenticated on the system",
-                    "when": f"The user requests {story.get('title', 'the feature')}",
-                    "then": "The system processes the request and returns successful output"
-                }]
-
-        return stories_data
+        for idx, story in enumerate(data["user_stories"]):
+            story["user_story_id"] = story.get("user_story_id") or f"US-{idx + 1:03d}"
+        # Enforced here, not left to the model: identical sizing or priority on every story is a default, not an estimate.
+        stories = data["user_stories"]
+        if len(stories) >= 3:
+            for field in ("story_points", "priority"):
+                if len({s.get(field) for s in stories}) == 1:
+                    for s in stories:
+                        s[field] = None
+        if not data["epics"]:
+            data["epics"] = sorted({s["epic"] for s in data["user_stories"] if s.get("epic")})
+        return data
 
 
 agile_stories_agent = AgileStoriesAgent()

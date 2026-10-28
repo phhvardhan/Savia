@@ -1,4 +1,4 @@
-import { API_BASE, request, uploadFile } from './api';
+import { API_BASE, ApiError, downloadFile, request, uploadFile } from './api';
 
 /** Response of POST /ingestion/upload. */
 export interface UploadResult {
@@ -38,6 +38,16 @@ export interface Recommendation {
   next_action: string;
   /** 'llm' when an AI model chose the agents; 'keyword' when it fell back to keyword scoring. */
   source?: 'llm' | 'keyword';
+  plan?: PlanStep[];
+}
+
+export interface PlanStep {
+  step: number;
+  agent: string;
+  agent_name: string;
+  after: string[];
+  uses_existing: string[];
+  approval_needed_before_next: boolean;
 }
 
 /**
@@ -250,15 +260,41 @@ export function recommendAgents(body: {
   return request<Recommendation>('/savia/recommend', { method: 'POST', body });
 }
 
-/** Screen 10: records the approval of the run's current stage on the workflow. */
-export function approveWorkflow(workflowId: string, approvedBy: string) {
-  return request<{ status: string; stage: string }>(`/workflows/${encodeURIComponent(workflowId)}/approve`, {
+export function approveWorkflow(workflowId: string, approvedBy: string, artifactId: string) {
+  return request<{ status: string; stage: string; artifact_id: string; version: number }>(
+    `/workflows/${encodeURIComponent(workflowId)}/approve`,
+    {
+      method: 'POST',
+      body: { artifact_id: artifactId, user_id: approvedBy, comments: `Approved by ${approvedBy}` },
+    },
+  );
+}
+
+/** POST /workflows/{id}/next-agent: the orchestrator's pick for who takes an output next. */
+export interface NextAgentDecision {
+  agent: string | null;
+  agent_name?: string;
+  reason: string;
+  confidence?: number;
+  builds_on_output?: boolean;
+  alternatives?: string[];
+  /** The recommendation the pages work from, with the chosen agent first. */
+  recommendation: Recommendation;
+}
+
+export function getNextAgent(workflowId: string, artifactId: string): Promise<NextAgentDecision> {
+  return request<NextAgentDecision>(`/workflows/${encodeURIComponent(workflowId)}/next-agent`, {
     method: 'POST',
-    body: { user_id: approvedBy, comments: `Approved by ${approvedBy}` },
+    body: { artifact_id: artifactId },
   });
 }
 
-/** Response of POST /agents/{agent}. */
+export interface QualityReport {
+  unsupported_figures?: string[];
+  dangling_references?: string[];
+  checked?: boolean;
+}
+
 export interface AgentRun {
   workflow_id: string | null;
   artifact_id: string;
@@ -266,20 +302,41 @@ export interface AgentRun {
   stage: string;
   version: number;
   content: Record<string, unknown>;
+  quality?: QualityReport;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  upstream_used?: string[];
+  upstream_unapproved?: string[];
+  /** The orchestrator's verdict on this output, the same rubric in every iteration. */
+  readiness?: { ready: boolean; score: number; issues: string[]; attempts: number } | null;
+  run_id?: string | null;
 }
 
-export function runAgent(
+interface RunStatus {
+  id: string;
+  status: 'queued' | 'running' | 'done' | 'failed';
+  error: string | null;
+  result: AgentRun | null;
+}
+
+const POLL_MS = 2000;
+const RUN_LIMIT_MS = 15 * 60_000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function runAgent(
   agent: string,
-  body: { workflow_id?: string | null; input_text?: string },
+  body: { workflow_id?: string | null; input_text?: string; source_artifact_id?: string },
 ): Promise<AgentRun> {
-  return request<AgentRun>(`/agents/${agent}`, {
-    method: 'POST',
-    // Without this the stage gate rejects a workflow that has not reached
-    // this agent's stage yet (agent_route.py checks can_advance).
-    body: { ...body, bypass_approval: true },
-    // An LLM run on a long document takes tens of seconds.
-    timeoutMs: 180_000,
-  });
+  const started = await request<RunStatus>(`/agents/${encodeURIComponent(agent)}/runs`, { method: 'POST', body });
+  const deadline = Date.now() + RUN_LIMIT_MS;
+  let run = started;
+  while (run.status === 'queued' || run.status === 'running') {
+    if (Date.now() > deadline) throw new ApiError('The agent is still working after 15 minutes. Try again later.', 0);
+    await sleep(POLL_MS);
+    run = await request<RunStatus>(`/agents/runs/${encodeURIComponent(started.id)}`);
+  }
+  if (run.status === 'failed' || !run.result) throw new ApiError(run.error || 'The agent run failed.', 0);
+  return run.result;
 }
 
 export interface OutputPart {
@@ -385,8 +442,44 @@ export function summariseContent(content: Record<string, unknown>): OutputPart[]
 }
 
 /** Direct download link for an agent's output as a styled Word or Excel file. */
-export function artifactExportUrl(artifactId: string, fmt: 'docx' | 'xlsx'): string {
-  return `${API_BASE}/workflows/artifacts/${encodeURIComponent(artifactId)}/export.${fmt}`;
+/** The main file an agent's output downloads as: a deck for the Solution Analyzer (it gets presented), Word otherwise. */
+export function documentFormat(agentId: string | null | undefined): { fmt: 'pptx' | 'docx'; label: string } {
+  return agentId === 'solution-analyzer' ? { fmt: 'pptx', label: 'PowerPoint' } : { fmt: 'docx', label: 'Word' };
+}
+
+export function downloadArtifact(artifactId: string, fmt: 'docx' | 'xlsx' | 'pptx'): Promise<void> {
+  return downloadFile(`/workflows/artifacts/${encodeURIComponent(artifactId)}/export.${fmt}`, `savia-${artifactId}.${fmt}`);
+}
+
+/** J&J brand roles, in document order. Styles come from backend/app/brand/jnj_tokens.py. */
+export type BrandRole = 'eyebrow' | 'headline' | 'subhead' | 'section_heading' | 'item_title' | 'body' | 'footer';
+
+export interface BrandDocument {
+  /** The branded content, styles and fonts; validated by the backend exactly like the Word export. */
+  document: {
+    eyebrow: string | null;
+    headline: string;
+    subhead: string | null;
+    sections: Array<{
+      heading: string;
+      body: string[];
+      items: Array<{ title: string | null; fields: Array<{ label: string; value: string }> }>;
+    }>;
+    footer: string;
+  };
+  styles: Record<BrandRole, { font_family: string; size_pt: number; bold: boolean; color: string; background: string }>;
+  fonts: Array<{ family: string; weight: number; file: string }>;
+  page_background: string;
+  rule_color: string;
+}
+
+/** GET /workflows/artifacts/{id}/brand-document */
+export function getBrandDocument(artifactId: string): Promise<BrandDocument> {
+  return request<BrandDocument>(`/workflows/artifacts/${encodeURIComponent(artifactId)}/brand-document`);
+}
+
+export function brandFontUrl(file: string): string {
+  return `${API_BASE}/workflows/brand/fonts/${encodeURIComponent(file)}`;
 }
 
 /** POST /workflows/artifacts/{id}/suggest-edit — an AI draft of one section, not yet saved. */

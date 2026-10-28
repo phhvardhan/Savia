@@ -1,22 +1,26 @@
 import os
 import tempfile
 from typing import List, Optional, Tuple
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from starlette.concurrency import run_in_threadpool
+from app.core.extract import transcribe_audio_video
 from app.services.document_parser import document_parser
 from app.orchestration.workflow_engine import workflow_engine
-from app.schemas.workflow_schema import WorkflowCreateRequest
+from app.core.config import settings
 
 router = APIRouter()
 
 
-MAX_FILES = 10  # ponytail: fixed cap; raise with care, every file is parsed (and audio transcribed) inline
+MAX_FILES = 10
 
 
 async def _parse_upload(upload: UploadFile) -> Tuple[str, str, dict]:
-    """Parse one uploaded file via a uniquely named temp copy (two files may share a name)."""
+    data = await upload.read()
+    if len(data) > settings.MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"'{upload.filename}' is larger than {settings.MAX_UPLOAD_MB} MB.")
     suffix = os.path.splitext(upload.filename or "")[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await upload.read())
+        tmp.write(data)
         temp_path = tmp.name
     try:
         return await document_parser.parse_and_normalize(temp_path, upload.filename)
@@ -30,7 +34,7 @@ async def _parse_upload(upload: UploadFile) -> Tuple[str, str, dict]:
 @router.post("/upload", tags=["Ingestion"])
 async def upload_document(
     files: Optional[List[UploadFile]] = File(None),
-    file: Optional[UploadFile] = File(None),  # single-file clients keep working
+    file: Optional[UploadFile] = File(None),
 ):
     uploads = [f for f in (files or []) + ([file] if file else []) if f and f.filename]
     if not uploads:
@@ -42,6 +46,8 @@ async def upload_document(
     for upload in uploads:
         try:
             parsed.append(await _parse_upload(upload))
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"Could not read '{upload.filename}': {e}")
 
@@ -49,8 +55,6 @@ async def upload_document(
         normalized_text, input_type, metadata = parsed[0]
         source_documents = [metadata]
     else:
-        # One header per file so agents and the recommender can tell files apart
-        # (and fit_text can give each a fair share of the context window).
         total = len(parsed)
         normalized_text = "\n\n".join(
             f"===== FILE {i} of {total}: {meta['filename']} ({kind}) =====\n{text}"
@@ -85,6 +89,24 @@ async def upload_document(
         "normalized_text_snippet": normalized_text[:500],
         "full_normalized_text": normalized_text,
     }
+
+
+@router.post("/dictate", tags=["Ingestion"])
+async def dictate(files: List[UploadFile] = File(...)):
+    upload = files[0]
+    suffix = os.path.splitext(upload.filename or "")[1] or ".webm"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await upload.read())
+    try:
+        text = await run_in_threadpool(transcribe_audio_video, tmp.name)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not transcribe the recording: {e}")
+    finally:
+        try:
+            os.remove(tmp.name)
+        except OSError:
+            pass
+    return {"text": "" if text.startswith("[Transcription:") else text.strip()}
 
 
 @router.post("/transcribe", tags=["Ingestion"])

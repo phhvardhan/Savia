@@ -4,6 +4,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
+import { FileTiles } from '../components/FileTiles';
 import { ArrowRightIcon, MicIcon, UploadIcon } from '../components/ui/Icons';
 import { INPUT_MODES, type InputModeMeta } from '../data/inputModes';
 import {
@@ -120,6 +121,7 @@ export function HomePage() {
 
   const {
     isListening,
+    isTranscribing,
     transcript,
     hasSupport: hasSpeechSupport,
     error: speechError,
@@ -341,8 +343,10 @@ export function HomePage() {
                   className={styles.finderInput}
                   placeholder={
                     isListening
-                      ? 'Listening to your speech... Speak now to transcribe live...'
-                      : activeModeMeta.placeholder
+                      ? 'Recording... speak now, then click the mic again to stop and transcribe.'
+                      : isTranscribing
+                        ? 'Transcribing your recording...'
+                        : activeModeMeta.placeholder
                   }
                   value={prompt}
                   onChange={(event) => {
@@ -391,10 +395,21 @@ export function HomePage() {
               </Button>
             </div>
 
+            {/* Attached files, one tile each */}
+            {attachment && (
+              <FileTiles
+                files={attachment.files}
+                onRemove={(i) => {
+                  const rest = attachment.files.filter((_, j) => j !== i);
+                  setAttachment(rest.length ? attachmentFromFiles(rest) : null);
+                }}
+              />
+            )}
+
             {activeModeMeta.kind === 'speak' && (!hasSpeechSupport || speechError) && (
               <p className={styles.fileChosen} role="alert">
                 {!hasSpeechSupport
-                  ? 'Voice dictation needs Chrome, Edge or Safari. Type instead, or upload a recording.'
+                  ? 'Voice dictation needs a microphone and a secure page (https:// or localhost). Type instead, or upload a recording.'
                   : speechError?.includes('not-allowed') || speechError?.includes('service-not-allowed')
                     ? 'Microphone access is blocked. Allow it from the icon in the address bar, then click the mic again.'
                     : speechError?.includes('network')
@@ -425,28 +440,6 @@ export function HomePage() {
               <p className={styles.fileChosen}>Fetching Jira issue details...</p>
             )}
 
-            {/* Attached File Pill */}
-            {attachment && (
-              <p className={styles.fileChosen}>
-                Attached ({attachment.files.length} file{attachment.files.length === 1 ? '' : 's'}):{' '}
-                {attachment.files.map((f, i) => (
-                  <span key={`${f.name}:${f.lastModified}`}>
-                    <strong>{f.name}</strong>
-                    <button
-                      type="button"
-                      className={styles.fileRemove}
-                      aria-label={`Remove ${f.name}`}
-                      onClick={() => {
-                        const rest = attachment.files.filter((_, j) => j !== i);
-                        setAttachment(rest.length ? attachmentFromFiles(rest) : null);
-                      }}
-                    >
-                      Remove
-                    </button>{' '}
-                  </span>
-                ))}
-              </p>
-            )}
           </div>
 
           {/* Dynamic Top Counters */}

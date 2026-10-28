@@ -1,8 +1,14 @@
 from enum import Enum
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 import uuid
+
+LEGACY_OUTPUT_KEYS = {"agile_stories": "agile-stories", "tests": "test"}
+
+
+def _now() -> str:
+    return datetime.utcnow().isoformat()
 
 
 class StageEnum(str, Enum):
@@ -23,10 +29,11 @@ class ApprovalStatus(str, Enum):
 
 
 class TraceabilityLink(BaseModel):
-    requirement_id: Optional[str] = None
-    user_story_id: Optional[str] = None
-    design_id: Optional[str] = None
-    test_case_id: Optional[str] = None
+    requirement_ids: List[str] = Field(default_factory=list)
+    user_story_ids: List[str] = Field(default_factory=list)
+    design_ids: List[str] = Field(default_factory=list)
+    test_case_ids: List[str] = Field(default_factory=list)
+    upstream_artifact_ids: List[str] = Field(default_factory=list)
     source_reference: Optional[str] = None
 
 
@@ -38,10 +45,18 @@ class Artifact(BaseModel):
     version: int = 1
     content: Dict[str, Any]
     traceability: TraceabilityLink = Field(default_factory=TraceabilityLink)
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    quality: Dict[str, Any] = Field(default_factory=dict)
+    meta: Dict[str, Any] = Field(default_factory=dict)
+    created_at: str = Field(default_factory=_now)
     approval_status: ApprovalStatus = ApprovalStatus.PENDING
     approved_by: Optional[str] = None
     approved_at: Optional[str] = None
+    approval_comments: Optional[str] = None
+
+    @field_validator("traceability", mode="before")
+    @classmethod
+    def _legacy_traceability(cls, value):
+        return value if isinstance(value, (dict, TraceabilityLink)) else {}
 
 
 class WorkflowSession(BaseModel):
@@ -52,13 +67,18 @@ class WorkflowSession(BaseModel):
     source_documents: List[Dict[str, Any]] = Field(default_factory=list)
     normalized_input: str = ""
     input_type: str = "unknown"
-    outputs: Dict[str, Any] = Field(default_factory=lambda: {
-        "mom": None,
-        "agile_stories": None,
-        "ddl3": None,
-        "tests": None
-    })
+    outputs: Dict[str, Any] = Field(default_factory=dict)
     approvals: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     history: List[Dict[str, Any]] = Field(default_factory=list)
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = Field(default_factory=_now)
+    updated_at: str = Field(default_factory=_now)
+
+    @field_validator("outputs", mode="before")
+    @classmethod
+    def _legacy_outputs(cls, value):
+        if not isinstance(value, dict):
+            return {}
+        return {LEGACY_OUTPUT_KEYS.get(k, k): v for k, v in value.items() if v}
+
+    def log(self, event: str, **details: Any) -> None:
+        self.history.append({"timestamp": _now(), "event": event, **details})

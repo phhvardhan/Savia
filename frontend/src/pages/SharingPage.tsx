@@ -70,7 +70,7 @@ export function SharingPage() {
     setWorking(true);
     setError(null);
     try {
-      await approveWorkflow(upload.workflow_id, approver);
+      await approveWorkflow(upload.workflow_id, approver, run.artifact_id);
       setApproved(true);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'The approval could not be recorded.');

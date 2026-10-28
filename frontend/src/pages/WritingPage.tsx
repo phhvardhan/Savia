@@ -8,7 +8,7 @@ import { StatusPill } from '../components/ui/StatusPill';
 import { StatGrid } from '../components/ui/StatGrid';
 import { Spinner } from '../components/ui/Spinner';
 import { Modal } from '../components/ui/Modal';
-import { agentMeta, artifactExportUrl, summariseContent } from '../lib/savia';
+import { agentMeta, downloadArtifact, documentFormat, summariseContent } from '../lib/savia';
 import type { RecommendedAgent, OutputPart } from '../lib/savia';
 import { useRun } from '../state/run';
 import { FanConnector } from '../components/ui/FanConnector';
@@ -22,7 +22,7 @@ const SECTION_MS = 6000;
 /** When the answer comes in early, the remaining sections finish at this pace. */
 const FINISH_MS = 400;
 /** Figma 05 → 06: once every section is Done, the document opens after this pause. */
-const OPEN_DOCUMENT_MS = 1200;
+const OPEN_DOCUMENT_MS = 2500;
 
 // Helper to check if item is a structured object
 function isObject(val: unknown): val is Record<string, unknown> {
@@ -92,15 +92,18 @@ export function WritingPage() {
         : phase === 'done'
           ? sectionTitles.length
           : 0;
-  const allDone = writing === sectionTitles.length;
-  const steps: Array<{ id: string; title: string; state: SectionState; note?: string }> = sectionTitles.map(
-    (title, i) => ({
-      id: title,
-      title,
-      state: i < writing ? 'Done' : i === writing && phase !== 'error' ? 'Writing' : 'Next',
-      note: phase === 'error' && i === writing ? error ?? undefined : undefined,
-    }),
-  );
+  // Once the run is in, the list shows what was actually produced, so it matches the cards on the right.
+  // While it runs there is nothing real to list yet, so the agent's usual sections tick over instead.
+  const hasParts = phase === 'done' && parts.length > 0;
+  const allDone = hasParts || writing === sectionTitles.length;
+  const steps: Array<{ id: string; title: string; state: SectionState; note?: string }> = hasParts
+    ? parts.map((part) => ({ id: part.key, title: part.title, state: 'Done' as SectionState }))
+    : sectionTitles.map((title, i) => ({
+        id: title,
+        title,
+        state: i < writing ? 'Done' : i === writing && phase !== 'error' ? 'Writing' : 'Next',
+        note: phase === 'error' && i === writing ? error ?? undefined : undefined,
+      }));
 
   // Opens the document by itself, but only when the run finished while you watched:
   // coming back to this page later should not bounce you away.
@@ -114,8 +117,9 @@ export function WritingPage() {
   const hasTables = Boolean(
     run && Object.values(run.content).some((v) => Array.isArray(v) && v.length > 0 && v.every(isObject)),
   );
-  const download = (fmt: 'docx' | 'xlsx') => {
-    if (run) window.location.assign(artifactExportUrl(run.artifact_id, fmt));
+  const mainFile = documentFormat(agent?.agent);
+  const download = (fmt: 'docx' | 'xlsx' | 'pptx') => {
+    if (run) void downloadArtifact(run.artifact_id, fmt).catch((e: Error) => window.alert(e.message));
   };
 
   const outputsRef = useRef<HTMLDivElement>(null);
@@ -416,7 +420,7 @@ export function WritingPage() {
             <Button variant="primary" onClick={() => navigate('/document')}>
               View Full {meta ? `${meta.label} Document Canvas` : 'Document Editor'}
             </Button>
-            {run && <Button onClick={() => download('docx')}>Download Word</Button>}
+            {run && <Button onClick={() => download(mainFile.fmt)}>Download {mainFile.label}</Button>}
             {run && hasTables && <Button onClick={() => download('xlsx')}>Download Excel</Button>}
             <Button onClick={() => navigate('/reading')}>Back to recommendations</Button>
           </div>

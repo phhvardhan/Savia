@@ -5,7 +5,8 @@ import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
 import { useRun } from '../state/run';
 import { useAttachment } from '../state/attachment';
-import { agentMeta, runAgent, sectionText, sectionTitle, type AgentRun, type RecommendedAgent } from '../lib/savia';
+import { agentMeta, downloadArtifact, documentFormat, runAgent, sectionText, sectionTitle, type AgentRun, type RecommendedAgent } from '../lib/savia';
+import { BrandPreview } from '../components/BrandPreview';
 import styles from './DocumentPage.module.css';
 
 type OutlineState = 'Traced' | 'Changed' | 'Needs you';
@@ -73,6 +74,13 @@ export function DocumentPage() {
   const runKey = `${agentId}:${workflowId}`;
   const cachedRun = agentRuns[runKey];
   const runContent = activeRun?.run?.content || cachedRun?.content || {};
+  const artifactId = activeRun?.run?.artifact_id || cachedRun?.artifact_id;
+  // Excel only makes sense when the output has tables (cases, inventory, actions…).
+  const hasTables = Object.values(runContent).some(
+    (v) => Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === 'object' && x !== null && !Array.isArray(x)),
+  );
+  // "Brand preview" shows the J&J-branded rendering (same as the Word download) instead of the editor.
+  const [showBrandPreview, setShowBrandPreview] = useState(false);
 
   // Agents with a dedicated layout below; any other agent gets a generic one built from its own output.
   const hasLayout = ['mom', 'readiness-audit', 'test', 'ddl3'].includes(agentId);
@@ -635,7 +643,17 @@ export function DocumentPage() {
           </div>
         )}
 
-        {agentId === 'readiness-audit' ? (
+        {artifactId && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <Button small onClick={() => setShowBrandPreview(!showBrandPreview)}>
+              {showBrandPreview ? 'Back to editing' : 'Brand preview'}
+            </Button>
+          </div>
+        )}
+
+        {showBrandPreview && artifactId ? (
+          <BrandPreview artifactId={artifactId} />
+        ) : agentId === 'readiness-audit' ? (
           /* DEDICATED READINESS & AUDIT EXECUTIVE SCORECARD DASHBOARD VIEW */
           <div className={styles.scorecardContainer}>
             {/* Executive Scorecard Top Bar */}
@@ -856,6 +874,16 @@ export function DocumentPage() {
                 <Button small onClick={() => navigate('/change')}>
                   Ask Savia
                 </Button>
+                {artifactId && (
+                  <Button small onClick={() => void downloadArtifact(artifactId, documentFormat(agentId).fmt).catch((e: Error) => window.alert(e.message))}>
+                    Download {documentFormat(agentId).label}
+                  </Button>
+                )}
+                {artifactId && hasTables && (
+                  <Button small onClick={() => void downloadArtifact(artifactId, 'xlsx').catch((e: Error) => window.alert(e.message))}>
+                    Download Excel
+                  </Button>
+                )}
                 <Button variant="primary" small onClick={() => navigate('/sharing')}>
                   Send for approval
                 </Button>
@@ -1334,6 +1362,9 @@ export function DocumentPage() {
                                   <div style={{ flex: 1 }}>
                                     <strong style={{ fontSize: '14px', color: '#0F172A' }}>{stepTitle}</strong>
                                     {stepDesc && <p style={{ fontSize: '13px', color: '#64748B', margin: '2px 0 0' }}>{stepDesc}</p>}
+                                    {typeof item === 'object' && Array.isArray(item.story_ids) && item.story_ids.length > 0 && (
+                                      <p style={{ fontSize: '12px', color: '#005EEB', margin: '4px 0 0' }}>Implements {item.story_ids.join(', ')}</p>
+                                    )}
                                   </div>
                                   {idx < ddl3Flow.length - 1 && (
                                     <span style={{ color: '#94A3B8', fontWeight: 800, fontSize: '16px' }}>↓</span>
@@ -1518,6 +1549,52 @@ export function DocumentPage() {
                           </div>
                         )}
                       </section>
+                      {Array.isArray(runContent.data_entities) && runContent.data_entities.length > 0 && (
+                        <section id="sec-data-entities" className={styles.docSection}>
+                          <div className={styles.docSectionHead}>
+                            <span className={styles.docSectionNum}>7</span>
+                            <h3 className={styles.docSectionTitle}>Data Entities</h3>
+                          </div>
+                          <div className={styles.tableWrapper}>
+                            <table className={styles.actionTable}>
+                              <thead><tr><th>Entity</th><th>Fields</th><th>Holds</th></tr></thead>
+                              <tbody>
+                                {(runContent.data_entities as any[]).map((e: any, idx: number) => (
+                                  <tr key={idx}>
+                                    <td><strong>{e.entity || `Entity ${idx + 1}`}</strong></td>
+                                    <td>{Array.isArray(e.fields) ? e.fields.map((f: string) => <code key={f} style={{ marginRight: 6 }}>{f}</code>) : ''}</td>
+                                    <td>{e.description || ''}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+                      )}
+
+                      {Array.isArray(runContent.configuration_parameters) && runContent.configuration_parameters.length > 0 && (
+                        <section id="sec-config-parameters" className={styles.docSection}>
+                          <div className={styles.docSectionHead}>
+                            <span className={styles.docSectionNum}>7</span>
+                            <h3 className={styles.docSectionTitle}>Configuration Parameters</h3>
+                          </div>
+                          <div className={styles.tableWrapper}>
+                            <table className={styles.actionTable}>
+                              <thead><tr><th>Parameter</th><th>Controls</th><th>Applies to</th><th>Value</th></tr></thead>
+                              <tbody>
+                                {(runContent.configuration_parameters as any[]).map((c: any, idx: number) => (
+                                  <tr key={idx}>
+                                    <td><code>{c.parameter || `PARAM_${idx + 1}`}</code></td>
+                                    <td>{c.description || ''}</td>
+                                    <td>{c.applies_to || '—'}</td>
+                                    <td>{c.value ?? 'Not stated'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+                      )}
                     </>
                   )}
 

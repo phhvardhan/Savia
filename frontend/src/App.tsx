@@ -2,9 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { ScrollToContent } from './components/layout/ScrollToContent';
 import { RunTheme } from './components/layout/RunTheme';
-// AUTH DISABLED — see the block at the bottom of this file to restore it.
-// import { RequireAuth } from './auth/RequireAuth';
-// import { LoginPage } from './pages/LoginPage';
+import { RequireAuth } from './auth/RequireAuth';
+import { AUTH_REQUIRED } from './auth/context';
+import { LoginPage } from './pages/LoginPage';
 import { ChangePage } from './pages/ChangePage';
 import { DecidePage } from './pages/DecidePage';
 import { DocumentPage } from './pages/DocumentPage';
@@ -78,33 +78,18 @@ function AppRoutes() {
 }
 
 export default function App() {
-  // Auth is switched off: every route is open and there is no login screen.
-  return <AppRoutes />;
+  if (!AUTH_REQUIRED) return <AppRoutes />;
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="*"
+        element={
+          <RequireAuth>
+            <AppRoutes />
+          </RequireAuth>
+        }
+      />
+    </Routes>
+  );
 }
-
-/* ---------------------------------------------------------------------------
- * TO RESTORE AUTH
- *
- * 1. Uncomment the two imports at the top of this file.
- * 2. Replace the body of App() above with:
- *
- *      return (
- *        <Routes>
- *          {/* Sits outside AppShell — no masthead or nav until there is a session. *\/}
- *          <Route path="/login" element={<LoginPage />} />
- *          <Route
- *            path="*"
- *            element={
- *              <RequireAuth>
- *                <AppRoutes />
- *              </RequireAuth>
- *            }
- *          />
- *        </Routes>
- *      );
- *
- * 3. In main.tsx, wrap <App /> back in <AuthProvider>.
- * 4. In components/layout/AppShell.tsx, swap DEMO_USER back for useAuth().
- *
- * Nothing was deleted: auth/, lib/api.ts and pages/LoginPage.tsx are all intact.
- * ------------------------------------------------------------------------- */
