@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
 import { StatGrid } from '../components/ui/StatGrid';
-import { AGENT_META, artifactExportUrl } from '../lib/savia';
+import { AGENT_META, artifactExportUrl, documentFormat } from '../lib/savia';
 import { useAttachment } from '../state/attachment';
 import { resetOnce } from '../lib/once';
 import { useRun, useCurrentRun } from '../state/run';
@@ -59,18 +59,22 @@ export function PublishPage() {
     );
   }
 
+  const mainFile = documentFormat(agentId);
   const destinations = [
     {
       id: 'confluence',
       logo: 'C',
       title: `CONFLUENCE · ${meta.full}`,
-      note: 'Not connected yet: publishing marks the run as published here. Share the Word file below until it is',
+      note: `Not connected yet: publishing marks the run as published here. Share the ${mainFile.label} file below until it is`,
     },
     {
       id: 'word',
-      logo: 'W',
-      title: 'WORD · download the approved version',
-      note: 'The J&J template is kept. This one works today: the file downloads straight away',
+      logo: mainFile.fmt === 'pptx' ? 'P' : 'W',
+      title: `${mainFile.label.toUpperCase()} · download the approved version`,
+      note:
+        mainFile.fmt === 'pptx'
+          ? 'A presentation-ready deck of the blueprint, one idea per slide. This one works today'
+          : 'The J&J template is kept. This one works today: the file downloads straight away',
     },
   ];
   const outcome = [
@@ -102,7 +106,7 @@ export function PublishPage() {
                 </div>
                 <div className={styles.destinationEnd}>
                   {item.id === 'word' ? (
-                    <Button small onClick={() => window.location.assign(artifactExportUrl(run.artifact_id, 'docx'))}>
+                    <Button small onClick={() => window.location.assign(artifactExportUrl(run.artifact_id, mainFile.fmt))}>
                       Download
                     </Button>
                   ) : (

@@ -1,12 +1,22 @@
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, Response, status
+from fastapi.responses import FileResponse
 from app.core.export import artifact_to_docx, artifact_to_xlsx
+from app.brand import fonts as brand_fonts
+from app.brand import jnj_tokens as brand_tokens
+from app.brand.adapter import to_brand_document
+from app.brand.renderer_docx import render_artifact_docx, render_docx_bytes, resolved_styles
+from app.brand.validator import BrandViolation
+from app.core.deck import solution_to_pptx
 from app.orchestration.orchestrator import ALL_AGENTS
 from app.core.agent import call_llm, fit_text
 from pydantic import BaseModel
 import json
 from app.orchestration.workflow_engine import workflow_engine
-from app.orchestration.stage_manager import stage_manager
+from app.orchestration import temporal_client
+from app.orchestration.workflows import (
+    AdvanceRequest, ApproveRequest, SaveArtifactRequest, SdlcWorkflow,
+)
 from app.schemas.workflow_schema import (
     WorkflowCreateRequest, ApproveStageRequest, AdvanceStageRequest
 )
@@ -17,13 +27,12 @@ router = APIRouter()
 
 @router.post("", tags=["Workflows"])
 async def create_workflow(payload: WorkflowCreateRequest):
-    session = workflow_engine.create_workflow(
+    return await temporal_client.start_session(
         title=payload.title or "SAVIA SDLC Session",
         source_documents=payload.source_documents or [],
         normalized_input=payload.normalized_input or "",
-        input_type=payload.input_type or "unknown"
+        input_type=payload.input_type or "unknown",
     )
-    return session
 
 
 @router.get("/{workflow_id}", tags=["Workflows"])
@@ -36,43 +45,28 @@ async def get_workflow(workflow_id: str):
 
 @router.post("/{workflow_id}/approve", tags=["Workflows"])
 async def approve_stage(workflow_id: str, payload: ApproveStageRequest):
-    session = workflow_engine.get_workflow(workflow_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Workflow '{workflow_id}' not found.")
-
-    updated_session = stage_manager.approve_stage(
-        session=session,
-        stage=session.current_stage,
-        user_id=payload.user_id,
-        comments=payload.comments
+    updated = await temporal_client.update(
+        workflow_id, SdlcWorkflow.approve,
+        ApproveRequest(user_id=payload.user_id or "system_user", comments=payload.comments or "Approved"),
     )
     return {
         "status": "approved",
-        "stage": session.current_stage.value,
-        "workflow": updated_session
+        "stage": updated.current_stage.value,
+        "workflow": updated
     }
 
 
 @router.post("/{workflow_id}/advance", tags=["Workflows"])
 async def advance_stage(workflow_id: str, payload: AdvanceStageRequest):
-    session = workflow_engine.get_workflow(workflow_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Workflow '{workflow_id}' not found.")
-
     try:
         target_stage = StageEnum(payload.target_stage)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid target stage '{payload.target_stage}'. Valid stages: {[s.value for s in StageEnum]}")
 
-    success, reason, updated = stage_manager.advance_stage(
-        session=session,
-        target_stage=target_stage,
-        bypass_approval=payload.bypass_approval
+    updated = await temporal_client.update(
+        workflow_id, SdlcWorkflow.advance,
+        AdvanceRequest(target_stage=target_stage, bypass_approval=bool(payload.bypass_approval)),
     )
-
-    if not success:
-        raise HTTPException(status_code=400, detail=reason)
-
     return {
         "status": "advanced",
         "current_stage": updated.current_stage.value,
@@ -97,31 +91,79 @@ async def get_artifact(artifact_id: str):
 AGENT_NAMES = {aid: name for aid, name, _ in ALL_AGENTS}
 
 EXPORT_TYPES = {
-    "docx": (artifact_to_docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    # J&J-branded Word (app/brand). The older artifact_to_docx is kept but no longer used here.
+    "docx": (render_artifact_docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
     "xlsx": (artifact_to_xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
 }
 
 
 @router.get("/artifacts/{artifact_id}/export.{fmt}", tags=["Artifacts"])
 async def export_artifact(artifact_id: str, fmt: str):
-    """Download an agent's output as a styled Word document or Excel workbook."""
-    if fmt not in EXPORT_TYPES:
-        raise HTTPException(status_code=400, detail="Format must be docx or xlsx.")
+    """Download an agent's output as Word, Excel or (Solution Analyzer only) a PowerPoint deck."""
+    if fmt not in EXPORT_TYPES and fmt != "pptx":
+        raise HTTPException(status_code=400, detail="Format must be docx, xlsx or pptx.")
     artifact = workflow_engine.get_artifact(artifact_id)
     if not artifact:
         raise HTTPException(status_code=404, detail=f"Artifact '{artifact_id}' not found.")
+    agent_name = AGENT_NAMES.get(artifact.agent_name, artifact.agent_name)
+
+    if fmt == "pptx":
+        # The Solution Analyzer's blueprint is meant to be presented, so it ships as a deck.
+        if artifact.agent_name != "solution-analyzer":
+            raise HTTPException(status_code=400, detail="PowerPoint export is only available for the Solution Analyzer.")
+        subtitle = f"Prepared with SAVIA · {agent_name} · version {artifact.version}"
+        try:
+            data = solution_to_pptx(artifact.content, subtitle)
+        except BrandViolation as e:  # the deck broke a J&J brand rule: a bug, say exactly which
+            raise HTTPException(status_code=500, detail=str(e))
+        filename = f"savia-solution-blueprint-v{artifact.version}.pptx"
+        return Response(data, media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
     build, media_type = EXPORT_TYPES[fmt]
-    agent_name = AGENT_NAMES.get(artifact.agent_name, artifact.agent_name)
-    title = str(artifact.content.get("title") or agent_name)
-    subtitle = f"Generated by SAVIA · {agent_name} · version {artifact.version} · {artifact.created_at[:10]}"
+    title, subtitle = _document_titles(artifact, agent_name)
     try:
         data = build(title, subtitle, artifact.content)
+    except BrandViolation as e:  # our renderer broke a brand rule: a bug, say exactly which
+        raise HTTPException(status_code=500, detail=str(e))
     except ValueError as e:  # e.g. nothing tabular to put in Excel
         raise HTTPException(status_code=422, detail=str(e))
 
     filename = f"savia-{artifact.agent_name}-v{artifact.version}.{fmt}"
     return Response(data, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+def _document_titles(artifact, agent_name: str) -> tuple[str, str]:
+    title = str(artifact.content.get("title") or agent_name)
+    subtitle = f"Generated by SAVIA · {agent_name} · version {artifact.version} · {artifact.created_at[:10]}"
+    return title, subtitle
+
+
+@router.get("/artifacts/{artifact_id}/brand-document", tags=["Artifacts"])
+async def brand_document(artifact_id: str):
+    """The J&J-branded document for the on-screen preview: the same content, styles and
+    validation as the Word export, so the two never drift apart."""
+    artifact = workflow_engine.get_artifact(artifact_id)
+    if not artifact:
+        raise HTTPException(status_code=404, detail=f"Artifact '{artifact_id}' not found.")
+    doc = to_brand_document(*_document_titles(artifact, AGENT_NAMES.get(artifact.agent_name, artifact.agent_name)),
+                            artifact.content)
+    try:
+        render_docx_bytes(doc)  # runs the brand validator
+    except BrandViolation as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"document": doc.model_dump(), "styles": resolved_styles(), "fonts": brand_fonts.font_faces(),
+            "page_background": brand_tokens.hex_for(brand_tokens.PAGE_BACKGROUND),
+            "rule_color": brand_tokens.hex_for(brand_tokens.RULE_COLOR)}
+
+
+@router.get("/brand/fonts/{filename}", tags=["Artifacts"])
+async def brand_font(filename: str):
+    """Serves a Johnson font file from the configured fonts folder (only files that are listed there)."""
+    match = next((p for p in brand_fonts.font_files() if p.name == filename), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Font not found.")
+    return FileResponse(match)
 
 
 
@@ -214,12 +256,9 @@ async def apply_edit(artifact_id: str, payload: ApplyEditRequest):
     if payload.section not in artifact.content:
         raise HTTPException(status_code=404, detail=f"Section '{payload.section}' not in this output.")
     content = {**artifact.content, payload.section: payload.value}
-    return workflow_engine.save_artifact(
-        workflow_id=artifact.workflow_id,
-        agent_name=artifact.agent_name,
-        stage=artifact.stage,
-        content=content,
-        traceability=artifact.traceability,
+    return await temporal_client.update(
+        artifact.workflow_id, SdlcWorkflow.save_artifact_version,
+        SaveArtifactRequest(agent_name=artifact.agent_name, stage=artifact.stage, content=content, traceability=artifact.traceability),
     )
 
 
@@ -311,10 +350,7 @@ async def record_decision(artifact_id: str, payload: RecordDecisionRequest):
     }
     if not updates:
         raise HTTPException(status_code=502, detail="Savia could not work out where to record this decision.")
-    return workflow_engine.save_artifact(
-        workflow_id=artifact.workflow_id,
-        agent_name=artifact.agent_name,
-        stage=artifact.stage,
-        content={**artifact.content, **updates},
-        traceability=artifact.traceability,
+    return await temporal_client.update(
+        artifact.workflow_id, SdlcWorkflow.save_artifact_version,
+        SaveArtifactRequest(agent_name=artifact.agent_name, stage=artifact.stage, content={**artifact.content, **updates}, traceability=artifact.traceability),
     )

@@ -28,6 +28,9 @@ class Settings:
     @property
     def GROQ_API_KEY(self) -> str:
         _reload_env()
+        # LLM_PROVIDER=azure_openai means the J&J GenAI endpoint only: no Groq for chat or speech-to-text
+        if self.LLM_PROVIDER == "azure_openai":
+            return ""
         return os.getenv("GROQ_API_KEY", "").strip()
 
     @property
@@ -71,14 +74,28 @@ class Settings:
         custom_path = os.getenv("WHISPER_MODEL_PATH", "").strip()
         if custom_path:
             return Path(custom_path)
-        local_repo_path = BASE_DIR / "models" / "faster-whisper-tiny"
-        if local_repo_path.exists():
-            return local_repo_path
+        # Most accurate local model first; tiny is the small fallback
+        for name in ("faster-whisper-small.en", "faster-whisper-tiny"):
+            local_repo_path = BASE_DIR / "models" / name
+            if local_repo_path.exists():
+                return local_repo_path
         return Path(self.WHISPER_MODEL)
 
     @property
     def UPLOAD_DIR(self) -> str:
         return os.getenv("UPLOAD_DIR", "uploads")
+
+    @property
+    def TEMPORAL_ADDRESS(self) -> str:
+        return os.getenv("TEMPORAL_ADDRESS", "localhost:7233")
+
+    @property
+    def TEMPORAL_NAMESPACE(self) -> str:
+        return os.getenv("TEMPORAL_NAMESPACE", "default")
+
+    @property
+    def TEMPORAL_TASK_QUEUE(self) -> str:
+        return os.getenv("TEMPORAL_TASK_QUEUE", "savia")
 
     @property
     def STORAGE_BACKEND(self) -> str:

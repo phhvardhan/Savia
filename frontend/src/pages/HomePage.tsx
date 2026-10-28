@@ -120,6 +120,7 @@ export function HomePage() {
 
   const {
     isListening,
+    isTranscribing,
     transcript,
     hasSupport: hasSpeechSupport,
     error: speechError,
@@ -341,8 +342,10 @@ export function HomePage() {
                   className={styles.finderInput}
                   placeholder={
                     isListening
-                      ? 'Listening to your speech... Speak now to transcribe live...'
-                      : activeModeMeta.placeholder
+                      ? 'Recording... speak now, then click the mic again to stop and transcribe.'
+                      : isTranscribing
+                        ? 'Transcribing your recording...'
+                        : activeModeMeta.placeholder
                   }
                   value={prompt}
                   onChange={(event) => {
@@ -394,7 +397,7 @@ export function HomePage() {
             {activeModeMeta.kind === 'speak' && (!hasSpeechSupport || speechError) && (
               <p className={styles.fileChosen} role="alert">
                 {!hasSpeechSupport
-                  ? 'Voice dictation needs Chrome, Edge or Safari. Type instead, or upload a recording.'
+                  ? 'Voice dictation needs a microphone and a secure page (https:// or localhost). Type instead, or upload a recording.'
                   : speechError?.includes('not-allowed') || speechError?.includes('service-not-allowed')
                     ? 'Microphone access is blocked. Allow it from the icon in the address bar, then click the mic again.'
                     : speechError?.includes('network')

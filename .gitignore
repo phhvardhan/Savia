@@ -28,3 +28,6 @@ __MACOSX/
 
 # real user/meeting records, recreated empty by core/storage.py
 backend/app/data/*.data.txt
+
+# proprietary J&J font files for the brand renderer (never commit)
+backend/app/brand/fonts/

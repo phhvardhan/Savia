@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 from app.orchestration.orchestrator import savia_orchestrator
+from app.orchestration import temporal_client
 from app.orchestration.workflow_engine import workflow_engine
+from app.orchestration.workflows import RecommendRequest, SdlcWorkflow
 from app.schemas.workflow_schema import RecommendationRequest, RecommendationResponse
 from app.models.workflow import WorkflowSession
 
@@ -27,21 +29,18 @@ async def savia_recommend_agent(payload: RecommendationRequest):
             detail="Either workflow_id or raw_text must be provided to SAVIA Recommendation Layer."
         )
 
-    if not session:
-        # Create temporary transient session for analysis
-        session = WorkflowSession(
-            normalized_input=raw_text,
-            input_type=input_type
-        )
+    if session:
+        return await temporal_client.update(session.workflow_id, SdlcWorkflow.recommend_agents, RecommendRequest(
+            raw_text=raw_text, input_type=input_type, filename=payload.filename,
+        ))
 
-    recommendation = await savia_orchestrator.recommend(
-        session=session,
+    # No session yet: a one-off analysis with nothing to keep, so it skips Temporal.
+    return await savia_orchestrator.recommend(
+        session=WorkflowSession(normalized_input=raw_text, input_type=input_type),
         raw_text=raw_text,
         input_type=input_type,
         filename=payload.filename
     )
-
-    return recommendation
 
 
 @router.post("/orchestrate", tags=["SAVIA Layer / SAVIA Recommendation"])
@@ -56,13 +55,11 @@ async def savia_orchestrate(payload: dict):
     input_type = payload.get("input_type") or (session.input_type if session else "unknown")
 
     if not session:
-        session = workflow_engine.create_workflow(
-            title="SAVIA Orchestrated Pipeline",
-            normalized_input=raw_text,
-            input_type=input_type
-        )
+        session = await temporal_client.start_session("SAVIA Orchestrated Pipeline", [], raw_text, input_type)
 
-    rec = await savia_orchestrator.recommend(session, raw_text, input_type)
+    rec = await temporal_client.update(session.workflow_id, SdlcWorkflow.recommend_agents, RecommendRequest(
+        raw_text=raw_text, input_type=input_type,
+    ))
 
     return {
         "workflow": session.dict(),

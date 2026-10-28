@@ -385,8 +385,44 @@ export function summariseContent(content: Record<string, unknown>): OutputPart[]
 }
 
 /** Direct download link for an agent's output as a styled Word or Excel file. */
-export function artifactExportUrl(artifactId: string, fmt: 'docx' | 'xlsx'): string {
+/** The main file an agent's output downloads as: a deck for the Solution Analyzer (it gets presented), Word otherwise. */
+export function documentFormat(agentId: string | null | undefined): { fmt: 'pptx' | 'docx'; label: string } {
+  return agentId === 'solution-analyzer' ? { fmt: 'pptx', label: 'PowerPoint' } : { fmt: 'docx', label: 'Word' };
+}
+
+export function artifactExportUrl(artifactId: string, fmt: 'docx' | 'xlsx' | 'pptx'): string {
   return `${API_BASE}/workflows/artifacts/${encodeURIComponent(artifactId)}/export.${fmt}`;
+}
+
+/** J&J brand roles, in document order. Styles come from backend/app/brand/jnj_tokens.py. */
+export type BrandRole = 'eyebrow' | 'headline' | 'subhead' | 'section_heading' | 'item_title' | 'body' | 'footer';
+
+export interface BrandDocument {
+  /** The branded content, styles and fonts; validated by the backend exactly like the Word export. */
+  document: {
+    eyebrow: string | null;
+    headline: string;
+    subhead: string | null;
+    sections: Array<{
+      heading: string;
+      body: string[];
+      items: Array<{ title: string | null; fields: Array<{ label: string; value: string }> }>;
+    }>;
+    footer: string;
+  };
+  styles: Record<BrandRole, { font_family: string; size_pt: number; bold: boolean; color: string; background: string }>;
+  fonts: Array<{ family: string; weight: number; file: string }>;
+  page_background: string;
+  rule_color: string;
+}
+
+/** GET /workflows/artifacts/{id}/brand-document */
+export function getBrandDocument(artifactId: string): Promise<BrandDocument> {
+  return request<BrandDocument>(`/workflows/artifacts/${encodeURIComponent(artifactId)}/brand-document`);
+}
+
+export function brandFontUrl(file: string): string {
+  return `${API_BASE}/workflows/brand/fonts/${encodeURIComponent(file)}`;
 }
 
 /** POST /workflows/artifacts/{id}/suggest-edit — an AI draft of one section, not yet saved. */

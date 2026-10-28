@@ -5,12 +5,14 @@ from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 from app.main import app
 from app.orchestration.workflow_engine import workflow_engine
-from app.orchestration.stage_manager import stage_manager
+from app.orchestration.stage_manager import can_advance
 from app.agents import (
     mom_agent, agile_stories_agent, ddl3_agent, test_agent,
     readiness_audit_agent, gap_analysis_agent, change_impact_agent, kdd_dab_agent
 )
 from app.models.workflow import StageEnum
+
+pytestmark = pytest.mark.usefixtures("temporal")  # ingestion and workflow routes start Temporal workflows
 
 client = TestClient(app)
 
@@ -247,28 +249,37 @@ def test_14_savia_recommendations(_llm):
     assert res_kdd.json()["primary_agent"] == "kdd-dab"
 
 
+def _new_session(title: str) -> str:
+    res = client.post("/api/v1/workflows", json={"title": title})
+    assert res.status_code == 200
+    return res.json()["workflow_id"]
+
+
 # 15. Test Approval Gates
 def test_15_approval_gates():
-    session = workflow_engine.create_workflow(title="Approval Test")
-    stage_manager.approve_stage(session, StageEnum.REQUIREMENTS, user_id="lead_ba")
-    refreshed = workflow_engine.get_workflow(session.workflow_id)
-    assert refreshed.approvals["requirements"]["status"] == "approved"
+    wf = _new_session("Approval Test")
+    assert client.post(f"/api/v1/workflows/{wf}/approve", json={"user_id": "lead_ba"}).status_code == 200
+    refreshed = workflow_engine.get_workflow(wf)
+    assert refreshed.approvals["ingestion"]["status"] == "approved"
+    assert refreshed.approvals["ingestion"]["approved_by"] == "lead_ba"
 
 
 # 16. Test Workflow Progression
 def test_16_workflow_progression():
-    session = workflow_engine.create_workflow(title="Progression Test")
-    stage_manager.approve_stage(session, StageEnum.REQUIREMENTS)
-    success, reason, updated = stage_manager.advance_stage(session, StageEnum.MOM)
-    assert success is True
-    assert updated.current_stage == StageEnum.MOM
+    wf = _new_session("Progression Test")
+    client.post(f"/api/v1/workflows/{wf}/approve", json={})
+    res = client.post(f"/api/v1/workflows/{wf}/advance", json={"target_stage": "mom"})
+    assert res.status_code == 200
+    assert workflow_engine.get_workflow(wf).current_stage == StageEnum.MOM
 
 
 # 17. Test Invalid Workflow Transition Block
 def test_17_invalid_workflow_transition():
-    session = workflow_engine.create_workflow(title="Invalid Transition Test")
-    can_adv, reason = stage_manager.can_advance(session, StageEnum.TESTING, bypass_approval=False)
-    assert can_adv is False
+    wf = _new_session("Invalid Transition Test")
+    res = client.post(f"/api/v1/workflows/{wf}/advance", json={"target_stage": "testing"})
+    assert res.status_code == 400
+    assert "has not been approved" in res.json()["detail"]
+    assert can_advance(workflow_engine.get_workflow(wf), StageEnum.TESTING)[0] is False
 
 
 # 18. Test Missing Input Handling
@@ -287,13 +298,11 @@ def test_19_malformed_json_handling():
 
 # 20. Test Artifact Traceability Links
 def test_20_artifact_traceability():
-    session = workflow_engine.create_workflow(title="Traceability Session")
-    artifact = workflow_engine.save_artifact(
-        workflow_id=session.workflow_id,
-        agent_name="agile-stories",
-        stage=StageEnum.USER_STORY,
-        content={"user_stories": []}
-    )
-    retrieved = workflow_engine.get_artifact(artifact.artifact_id)
-    assert retrieved.workflow_id == session.workflow_id
+    wf = _new_session("Traceability Session")
+    with patch("app.agents.agile_stories_agent.call_llm", new_callable=AsyncMock, return_value={"user_stories": []}):
+        res = client.post("/api/v1/agents/agile-stories", json={"workflow_id": wf, "input_text": "Stories please", "bypass_approval": True})
+    assert res.status_code == 200
+    retrieved = workflow_engine.get_artifact(res.json()["artifact_id"])
+    assert retrieved.workflow_id == wf
     assert retrieved.agent_name == "agile-stories"
+    assert retrieved.traceability.requirement_id == wf

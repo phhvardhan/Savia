@@ -125,9 +125,10 @@ async def call_azure_openai(system: str, user: str, api_key: Optional[str] = Non
         {"Content-Type": "application/json", "api-key": key},
     ]
 
+    # The J&J APIM serves the /openai/deployments/... route; the others 404 and only cost a round trip each
     candidate_urls = [
-        f"{endpoint}/deployments/{deployment}/chat/completions?api-version={api_version}",
         f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={api_version}",
+        f"{endpoint}/deployments/{deployment}/chat/completions?api-version={api_version}",
         f"{endpoint}/chat/completions?api-version={api_version}",
     ]
 
@@ -317,7 +318,8 @@ async def call_llm(system: str, user: str, api_key: Optional[str] = None, expect
         content = await call_openai(system, user, api_key)
         return await parse_json(content, expected_type=expected_type)
 
-    has_azure = bool(settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT)
+    # LLM_PROVIDER=groq skips Azure even when its keys are present (e.g. a Mac off the J&J network)
+    has_azure = bool(settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT) and settings.LLM_PROVIDER != "groq"
     has_groq = bool(settings.GROQ_API_KEY)
     has_openai = bool(settings.OPENAI_API_KEY)
 
@@ -329,6 +331,8 @@ async def call_llm(system: str, user: str, api_key: Optional[str] = None, expect
             logger.info("[LLM Pipeline] Success: Request served by Azure OpenAI!")
             return await parse_json(content, expected_type=expected_type)
         except Exception as e:
+            if settings.LLM_PROVIDER == "azure_openai":
+                raise  # pinned to the J&J endpoint: no Groq/OpenAI fallback
             logger.warning(
                 f"[LLM Pipeline] Azure OpenAI connection not possible ({e}). "
                 f"Proceeding immediately to Groq Cloud logic..."

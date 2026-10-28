@@ -2,8 +2,10 @@ import os
 import tempfile
 from typing import List, Optional, Tuple
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
+from starlette.concurrency import run_in_threadpool
+from app.core.extract import transcribe_audio_video
 from app.services.document_parser import document_parser
-from app.orchestration.workflow_engine import workflow_engine
+from app.orchestration import temporal_client
 from app.schemas.workflow_schema import WorkflowCreateRequest
 
 router = APIRouter()
@@ -70,7 +72,7 @@ async def upload_document(
         }
 
     first = uploads[0].filename
-    session = workflow_engine.create_workflow(
+    session = await temporal_client.start_session(
         title=f"Workflow - {first}" + (f" + {len(uploads) - 1} more" if len(uploads) > 1 else ""),
         source_documents=source_documents,
         normalized_input=normalized_text,
@@ -85,6 +87,26 @@ async def upload_document(
         "normalized_text_snippet": normalized_text[:500],
         "full_normalized_text": normalized_text,
     }
+
+
+@router.post("/dictate", tags=["Ingestion"])
+async def dictate(files: List[UploadFile] = File(...)):
+    """Transcribe a short mic clip with the local Whisper model. No workflow is created."""
+    upload = files[0]
+    suffix = os.path.splitext(upload.filename or "")[1] or ".webm"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await upload.read())
+    try:
+        text = await run_in_threadpool(transcribe_audio_video, tmp.name)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not transcribe the recording: {e}")
+    finally:
+        try:
+            os.remove(tmp.name)
+        except OSError:
+            pass
+    # transcribe_audio_video returns "[Transcription: ...]" placeholders instead of raising
+    return {"text": "" if text.startswith("[Transcription:") else text.strip()}
 
 
 @router.post("/transcribe", tags=["Ingestion"])

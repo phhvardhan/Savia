@@ -5,7 +5,8 @@ import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
 import { useRun } from '../state/run';
 import { useAttachment } from '../state/attachment';
-import { agentMeta, runAgent, sectionText, sectionTitle, type AgentRun, type RecommendedAgent } from '../lib/savia';
+import { agentMeta, artifactExportUrl, documentFormat, runAgent, sectionText, sectionTitle, type AgentRun, type RecommendedAgent } from '../lib/savia';
+import { BrandPreview } from '../components/BrandPreview';
 import styles from './DocumentPage.module.css';
 
 type OutlineState = 'Traced' | 'Changed' | 'Needs you';
@@ -73,6 +74,13 @@ export function DocumentPage() {
   const runKey = `${agentId}:${workflowId}`;
   const cachedRun = agentRuns[runKey];
   const runContent = activeRun?.run?.content || cachedRun?.content || {};
+  const artifactId = activeRun?.run?.artifact_id || cachedRun?.artifact_id;
+  // Excel only makes sense when the output has tables (cases, inventory, actions…).
+  const hasTables = Object.values(runContent).some(
+    (v) => Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === 'object' && x !== null && !Array.isArray(x)),
+  );
+  // "Brand preview" shows the J&J-branded rendering (same as the Word download) instead of the editor.
+  const [showBrandPreview, setShowBrandPreview] = useState(false);
 
   // Agents with a dedicated layout below; any other agent gets a generic one built from its own output.
   const hasLayout = ['mom', 'readiness-audit', 'test', 'ddl3'].includes(agentId);
@@ -635,7 +643,17 @@ export function DocumentPage() {
           </div>
         )}
 
-        {agentId === 'readiness-audit' ? (
+        {artifactId && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <Button small onClick={() => setShowBrandPreview(!showBrandPreview)}>
+              {showBrandPreview ? 'Back to editing' : 'Brand preview'}
+            </Button>
+          </div>
+        )}
+
+        {showBrandPreview && artifactId ? (
+          <BrandPreview artifactId={artifactId} />
+        ) : agentId === 'readiness-audit' ? (
           /* DEDICATED READINESS & AUDIT EXECUTIVE SCORECARD DASHBOARD VIEW */
           <div className={styles.scorecardContainer}>
             {/* Executive Scorecard Top Bar */}
@@ -856,6 +874,16 @@ export function DocumentPage() {
                 <Button small onClick={() => navigate('/change')}>
                   Ask Savia
                 </Button>
+                {artifactId && (
+                  <Button small onClick={() => window.location.assign(artifactExportUrl(artifactId, documentFormat(agentId).fmt))}>
+                    Download {documentFormat(agentId).label}
+                  </Button>
+                )}
+                {artifactId && hasTables && (
+                  <Button small onClick={() => window.location.assign(artifactExportUrl(artifactId, 'xlsx'))}>
+                    Download Excel
+                  </Button>
+                )}
                 <Button variant="primary" small onClick={() => navigate('/sharing')}>
                   Send for approval
                 </Button>

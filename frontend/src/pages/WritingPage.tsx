@@ -8,7 +8,7 @@ import { StatusPill } from '../components/ui/StatusPill';
 import { StatGrid } from '../components/ui/StatGrid';
 import { Spinner } from '../components/ui/Spinner';
 import { Modal } from '../components/ui/Modal';
-import { agentMeta, artifactExportUrl, summariseContent } from '../lib/savia';
+import { agentMeta, artifactExportUrl, documentFormat, summariseContent } from '../lib/savia';
 import type { RecommendedAgent, OutputPart } from '../lib/savia';
 import { useRun } from '../state/run';
 import { FanConnector } from '../components/ui/FanConnector';
@@ -114,7 +114,8 @@ export function WritingPage() {
   const hasTables = Boolean(
     run && Object.values(run.content).some((v) => Array.isArray(v) && v.length > 0 && v.every(isObject)),
   );
-  const download = (fmt: 'docx' | 'xlsx') => {
+  const mainFile = documentFormat(agent?.agent);
+  const download = (fmt: 'docx' | 'xlsx' | 'pptx') => {
     if (run) window.location.assign(artifactExportUrl(run.artifact_id, fmt));
   };
 
@@ -416,7 +417,7 @@ export function WritingPage() {
             <Button variant="primary" onClick={() => navigate('/document')}>
               View Full {meta ? `${meta.label} Document Canvas` : 'Document Editor'}
             </Button>
-            {run && <Button onClick={() => download('docx')}>Download Word</Button>}
+            {run && <Button onClick={() => download(mainFile.fmt)}>Download {mainFile.label}</Button>}
             {run && hasTables && <Button onClick={() => download('xlsx')}>Download Excel</Button>}
             <Button onClick={() => navigate('/reading')}>Back to recommendations</Button>
           </div>

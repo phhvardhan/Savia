@@ -3,6 +3,8 @@ from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 from app.main import app
 
+pytestmark = pytest.mark.usefixtures("temporal")
+
 client = TestClient(app)
 
 SAMPLE_TEXT = "Enterprise software requirements and architecture specification for order fulfillment and inventory management."
